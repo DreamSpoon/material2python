@@ -9,4 +9,4 @@ This addon may evolve as time goes by to include more info.
 
 Material 2 Python button is located in the material shader node view, Tool menu, Mat2Py.
 
-The output text-block will have a name the begins with: m2pText
+The output text-block will have a name that begins with: m2pText

@@ -64,7 +64,10 @@ class Mat2Python(boop.types.Operator):
 
         m2p_text.write(pres + "# links between nodes\n")
         for tree_link in mat.node_tree.links:
-            m2p_text.write(pres + "link = tree_links.new(new_nodes[\"" + tree_link.from_socket.node.name + "\"].outputs[" + str(cls.get_output_num_for_link(tree_link)) + "], new_nodes[\"" + tree_link.to_socket.node.name + "\"].inputs[" + str(cls.get_input_num_for_link(tree_link)) + "])\n")
+            flint = ""
+            if keep_links:
+                flint = "link = "
+            m2p_text.write(pres + flint + "tree_links.new(new_nodes[\"" + tree_link.from_socket.node.name + "\"].outputs[" + str(cls.get_output_num_for_link(tree_link)) + "], new_nodes[\"" + tree_link.to_socket.node.name + "\"].inputs[" + str(cls.get_input_num_for_link(tree_link)) + "])\n")
             if keep_links:
                 m2p_text.write(pres + "new_links.append(link)\n\n")
 
