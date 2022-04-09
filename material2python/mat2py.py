@@ -35,11 +35,11 @@ class Mat2Python(boop.types.Operator):
         return False
 
     def execute(self, fun):
-        self.do_it(fun, fun.scene.M2P_NumSpacePad, fun.scene.M2P_KeepLinks)
+        self.do_it(fun, fun.scene.M2P_NumSpacePad, fun.scene.M2P_KeepLinks, fun.scene.M2P_Do_Function)
         return {'FINISHED'}
 
     @classmethod
-    def do_it(cls, fun, space_pad, keep_links):
+    def do_it(cls, fun, space_pad, keep_links, make_into_function):
         if isinstance(space_pad, int):
             pres = " " * space_pad
         elif isinstance(space_pad, str):
@@ -51,11 +51,15 @@ class Mat2Python(boop.types.Operator):
 
         m2p_text = boop.data.texts.new(M2P_TEXT_NAME)
 
+        if make_into_function:
+            m2p_text.write("import bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
+
         m2p_text.write(pres + "# initialize variables\n")
         m2p_text.write(pres + "new_nodes = {}\n")
         if keep_links:
             m2p_text.write(pres + "new_links = []\n")
         m2p_text.write(pres + "tree_nodes = material.node_tree.nodes\n\n")
+        m2p_text.write(pres + "tree_links = material.node_tree.links\n\n")
         m2p_text.write(pres + "# material shader nodes\n")
         for tree_node in mat.node_tree.nodes:
             m2p_text.write(pres + "node = tree_nodes.new(type=\"" + tree_node.bl_idname + "\")\n")
@@ -70,6 +74,12 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + flint + "tree_links.new(new_nodes[\"" + tree_link.from_socket.node.name + "\"].outputs[" + str(cls.get_output_num_for_link(tree_link)) + "], new_nodes[\"" + tree_link.to_socket.node.name + "\"].inputs[" + str(cls.get_input_num_for_link(tree_link)) + "])\n")
             if keep_links:
                 m2p_text.write(pres + "new_links.append(link)\n\n")
+
+        if make_into_function:
+            m2p_text.write("# use python script to add nodes, and links between nodes, to the active material of " +
+                           "the active object\nobj = bpy.context.active_object\n" +
+                           "if obj != None and obj.active_material != None:\n" +
+                           "    add_material_nodes(obj.active_material)\n\n")
 
     @classmethod
     def get_input_num_for_link(cls, tr_link):
