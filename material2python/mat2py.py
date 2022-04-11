@@ -35,11 +35,11 @@ class Mat2Python(boop.types.Operator):
         return False
 
     def execute(self, fun):
-        self.do_it(fun, fun.scene.M2P_NumSpacePad, fun.scene.M2P_KeepLinks, fun.scene.M2P_Do_Function)
+        self.do_it(fun, fun.scene.M2P_NumSpacePad, fun.scene.M2P_KeepLinks, fun.scene.M2P_Make_Function, fun.scene.M2P_DeleteExisting)
         return {'FINISHED'}
 
     @classmethod
-    def do_it(cls, fun, space_pad, keep_links, make_into_function):
+    def do_it(cls, fun, space_pad, keep_links, make_into_function, delete_existing):
         if isinstance(space_pad, int):
             pres = " " * space_pad
         elif isinstance(space_pad, str):
@@ -53,6 +53,9 @@ class Mat2Python(boop.types.Operator):
 
         if make_into_function:
             m2p_text.write("import bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
+        if delete_existing:
+            m2p_text.write("# delete all nodes\n")
+            m2p_text.write("tree_nodes.clear()\n")
 
         m2p_text.write(pres + "# initialize variables\n")
         m2p_text.write(pres + "new_nodes = {}\n")

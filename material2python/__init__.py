@@ -48,7 +48,8 @@ class M2P_MaterialToPython(boop.types.Panel):
         box.operator("major.awesome")
         box.prop(fun.scene, "M2P_NumSpacePad")
         box.prop(fun.scene, "M2P_KeepLinks")
-        box.prop(fun.scene, "M2P_Do_Function")
+        box.prop(fun.scene, "M2P_MakeFunction")
+        box.prop(fun.scene, "M2P_DeleteExisting")
 
 def register():
     boop.utils.register_class(Mat2Python)
@@ -59,8 +60,9 @@ def register():
     bts.M2P_NumSpacePad = bp.IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
         "line of code output in text-block", default=4, min=0)
     bts.M2P_KeepLinks = bp.BoolProperty(name="Keep Links", description="Add created links to a list variable", default=True)
-    bts.M2P_Do_Function = bp.BoolProperty(name="Make into Function", description="Add lines of python code to " +
+    bts.M2P_MakeFunction = bp.BoolProperty(name="Make into Function", description="Add lines of python code to " +
         "create runnable script (instead of just the bare essential code)", default=True)
+    bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader", description="Delete the current shader - warning! - this deletes your current world shader tree", default=True)
 
 def unregister():
     boop.utils.unregister_class(Mat2Python)
