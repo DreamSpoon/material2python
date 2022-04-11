@@ -35,7 +35,7 @@ class Mat2Python(boop.types.Operator):
         return False
 
     def execute(self, fun):
-        self.do_it(fun, fun.scene.M2P_NumSpacePad, fun.scene.M2P_KeepLinks, fun.scene.M2P_Make_Function, fun.scene.M2P_DeleteExisting)
+        self.do_it(fun, fun.scene.M2P_NumSpacePad, fun.scene.M2P_KeepLinks, fun.scene.M2P_MakeFunction, fun.scene.M2P_DeleteExisting)
         return {'FINISHED'}
 
     @classmethod
@@ -53,23 +53,23 @@ class Mat2Python(boop.types.Operator):
 
         if make_into_function:
             m2p_text.write("import bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
-        if delete_existing:
-            m2p_text.write("# delete all nodes\n")
-            m2p_text.write("tree_nodes.clear()\n")
 
         m2p_text.write(pres + "# initialize variables\n")
         m2p_text.write(pres + "new_nodes = {}\n")
-        if keep_links:
-            m2p_text.write(pres + "new_links = []\n")
-        m2p_text.write(pres + "tree_nodes = material.node_tree.nodes\n\n")
-        m2p_text.write(pres + "tree_links = material.node_tree.links\n\n")
-        m2p_text.write(pres + "# material shader nodes\n")
+        m2p_text.write(pres + "tree_nodes = material.node_tree.nodes\n")
+        if delete_existing:
+            m2p_text.write(pres + "# delete all nodes\n")
+            m2p_text.write(pres + "tree_nodes.clear()\n")
+        m2p_text.write("\n" + pres + "# material shader nodes\n")
         for tree_node in mat.node_tree.nodes:
             m2p_text.write(pres + "node = tree_nodes.new(type=\"" + tree_node.bl_idname + "\")\n")
             m2p_text.write(pres + "node.location = (" + str(round(tree_node.location.x, 3)) + ", " + str(round(tree_node.location.y, 3)) + ")\n")
             m2p_text.write(pres + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
 
         m2p_text.write(pres + "# links between nodes\n")
+        if keep_links:
+            m2p_text.write(pres + "new_links = []\n")
+        m2p_text.write(pres + "tree_links = material.node_tree.links\n\n")
         for tree_link in mat.node_tree.links:
             flint = ""
             if keep_links:

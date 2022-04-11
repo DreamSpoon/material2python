@@ -62,7 +62,7 @@ def register():
     bts.M2P_KeepLinks = bp.BoolProperty(name="Keep Links", description="Add created links to a list variable", default=True)
     bts.M2P_MakeFunction = bp.BoolProperty(name="Make into Function", description="Add lines of python code to " +
         "create runnable script (instead of just the bare essential code)", default=True)
-    bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader", description="Delete the current shader - warning! - this deletes your current world shader tree", default=True)
+    bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader", description="Include code in the output that delete all nodes in World Shader Material", default=True)
 
 def unregister():
     boop.utils.unregister_class(Mat2Python)
