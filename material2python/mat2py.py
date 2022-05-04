@@ -59,12 +59,13 @@ class Mat2Python(boop.types.Operator):
         node_group = boop.data.node_groups.get(the_tree_to_use.name)
         is_the_tree_in_node_groups = (node_group != None)
 
+        m2p_text.write("# Blender Python script to re-create ")
         if make_into_function:
             if is_the_tree_in_node_groups:
-                m2p_text.write("import bpy\n\n# add nodes and links to node group \n" +
+                m2p_text.write("material Node Group named "+the_tree_to_use.name+"\n\nimport bpy\n\n# add nodes and links to node group \n" +
                                "def add_group_nodes(node_group_name):\n")
             else:
-                m2p_text.write("import bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
+                m2p_text.write("material named \""+mat.id.name+"\"\n\nimport bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
 
         if is_the_tree_in_node_groups:
             m2p_text.write(pres + "# initialize variables\n")
@@ -100,15 +101,23 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + "node.height = %f\n" % tree_node.height)
             m2p_text.write(pres + "node.color = (%f, %f, %f)\n" % tuple(tree_node.color))
             m2p_text.write(pres + "node.use_custom_color = %s\n" % tree_node.use_custom_color)
+            m2p_text.write(pres + "node.mute = %s\n" % tree_node.mute)
             m2p_text.write(pres + "node.location = (" + str(round(tree_node.location.x, 3)) + ", " +
                 str(round(tree_node.location.y, 3)) + ")\n")
             # Node Group shader node?
             if tree_node.bl_idname == 'ShaderNodeGroup':
                 # get node tree for creating Node Group shader node
                 m2p_text.write(pres + "node.node_tree = bpy.data.node_groups.get(\"" + tree_node.node_tree.name + "\")\n")
-            # Image Texture or Environment Texture node: get image if available
-            elif tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and tree_node.image != None:
-                m2p_text.write(pres + "node.image = bpy.data.images.get(\"%s\")\n" % tree_node.image.name)
+            else:
+                # Image Texture or Environment Texture node: get image if available
+                if tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and tree_node.image != None:
+                    m2p_text.write(pres + "node.image = bpy.data.images.get(\"%s\")\n" % tree_node.image.name)
+                # Math operation
+                if tree_node.bl_idname in ['ShaderNodeMath', 'ShaderNodeVectorMath']:
+                    m2p_text.write(pres + "node.operation = \"%s\"\n" % tree_node.operation)
+                # Attribute Name
+                if tree_node.bl_idname in ['ShaderNodeAttribute']:
+                    m2p_text.write(pres + "node.attribute_name = \"%s\"\n" % tree_node.attribute_name)
 
             # get node inputs default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), ... ]
             # TODO: this part needs more testing re: different node input default value(s) and type(s)
@@ -155,6 +164,8 @@ class Mat2Python(boop.types.Operator):
                                "the active object\nobj = bpy.context.active_object\n" +
                                "if obj != None and obj.active_material != None:\n" +
                                "    add_material_nodes(obj.active_material)\n")
+        # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
+        m2p_text.current_line_index = 0
 
     @classmethod
     def get_input_num_for_link(cls, tr_link):
