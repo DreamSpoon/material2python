@@ -56,7 +56,8 @@ class Mat2Python(boop.types.Operator):
         if use_edit_tree:
             the_tree_to_use = mat.edit_tree
 
-        is_the_tree_in_node_groups = (boop.data.node_groups.get(the_tree_to_use.name) != None)
+        node_group = boop.data.node_groups.get(the_tree_to_use.name)
+        is_the_tree_in_node_groups = (node_group != None)
 
         if make_into_function:
             if is_the_tree_in_node_groups:
@@ -68,8 +69,16 @@ class Mat2Python(boop.types.Operator):
         if is_the_tree_in_node_groups:
             m2p_text.write(pres + "# initialize variables\n")
             m2p_text.write(pres + "new_nodes = {}\n")
-            m2p_text.write(pres + "new_node_group = bpy.data.node_groups.new(name='"+the_tree_to_use.name+"', type='"+
+            m2p_text.write(pres + "new_node_group = bpy.data.node_groups.new(name=\""+the_tree_to_use.name+"\", type='"+
                            the_tree_to_use.bl_idname+"')\n")
+            # get the node group inputs and outputs
+            for ng_input in node_group.inputs:
+                m2p_text.write(pres + "new_node_group.inputs.new(type='"+ng_input.bl_socket_idname+"', name=\"" +
+                               ng_input.name+"\")\n")
+            for ng_output in node_group.outputs:
+                m2p_text.write(pres + "new_node_group.outputs.new(type='"+ng_output.bl_socket_idname+"', name=\"" +
+                               ng_output.name+"\")\n")
+
             m2p_text.write(pres + "tree_nodes = new_node_group.nodes")
         else:
             m2p_text.write(pres + "# initialize variables\n")
@@ -85,6 +94,20 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + "node = tree_nodes.new(type=\"" + tree_node.bl_idname + "\")\n")
             m2p_text.write(pres + "node.location = (" + str(round(tree_node.location.x, 3)) + ", " +
                 str(round(tree_node.location.y, 3)) + ")\n")
+            print("tree nodely = " + tree_node.name)
+            c = -1
+            for node_input in tree_node.inputs:
+                c = c + 1
+                # ignore virtual sockets
+                if node_input.bl_idname == 'NodeSocketVirtual':
+                    continue
+                print("gotta name it " + node_input.name)
+                if isinstance(node_input.default_value, float):
+                    m2p_text.write(pres + "node.inputs["+str(c)+"].default_value = "+str(node_input.default_value)+"\n")
+                    continue
+                for def_val_index in range(len(node_input.default_value)):
+                    m2p_text.write(pres + "node.inputs["+str(c)+"].default_value["+str(def_val_index)+"] = "+str(node_input.default_value[def_val_index])+"\n")
+
             m2p_text.write(pres + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
 
         m2p_text.write(pres + "# links between nodes\n")

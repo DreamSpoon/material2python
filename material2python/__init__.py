@@ -20,10 +20,10 @@ bl_info = {
     "name": "Material 2 Python",
     "description": "Convert material nodes to Python text-block.",
     "author": "Dave",
-    "version": (0, 0, 1),
+    "version": (0, 0, 2),
     "blender": (2, 80, 0),
     "location": "Material Shader Nodes",
-    "category": "Material Python",
+    "category": "Material",
 }
 
 import bpy as boop
