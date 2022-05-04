@@ -106,6 +106,9 @@ class Mat2Python(boop.types.Operator):
             if tree_node.bl_idname == 'ShaderNodeGroup':
                 # get node tree for creating Node Group shader node
                 m2p_text.write(pres + "node.node_tree = bpy.data.node_groups.get(\"" + tree_node.node_tree.name + "\")\n")
+            # Image Texture or Environment Texture node: get image if available
+            elif tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and tree_node.image != None:
+                m2p_text.write(pres + "node.image = bpy.data.images.get(\"%s\")\n" % tree_node.image.name)
 
             # get node inputs default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), ... ]
             # TODO: this part needs more testing re: different node input default value(s) and type(s)
