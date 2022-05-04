@@ -17,6 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 import bpy as boop
+from mathutils import Vector
 
 M2P_TEXT_NAME = "m2pText"
 
@@ -62,7 +63,7 @@ class Mat2Python(boop.types.Operator):
         m2p_text.write("# Blender Python script to re-create ")
         if make_into_function:
             if is_the_tree_in_node_groups:
-                m2p_text.write("material Node Group named "+the_tree_to_use.name+"\n\nimport bpy\n\n# add nodes and links to node group \n" +
+                m2p_text.write("material Node Group named \""+the_tree_to_use.name+"\"\n\nimport bpy\n\n# add nodes and links to node group \n" +
                                "def add_group_nodes(node_group_name):\n")
             else:
                 m2p_text.write("material named \""+mat.id.name+"\"\n\nimport bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
@@ -91,6 +92,9 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + "tree_nodes.clear()\n")
         m2p_text.write("\n" + pres + "# material shader nodes\n")
 
+        # set parenting order of nodes (e.g. parenting to frames) after creating all the nodes in the tree,
+        # so that parent nodes are referenced only after parent nodes are created
+        frame_parenting_text = ""
         # write info about the individual nodes
         for tree_node in the_tree_to_use.nodes:
             m2p_text.write(pres + "node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
@@ -102,40 +106,194 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + "node.color = (%f, %f, %f)\n" % tuple(tree_node.color))
             m2p_text.write(pres + "node.use_custom_color = %s\n" % tree_node.use_custom_color)
             m2p_text.write(pres + "node.mute = %s\n" % tree_node.mute)
-            m2p_text.write(pres + "node.location = (" + str(round(tree_node.location.x, 3)) + ", " +
-                str(round(tree_node.location.y, 3)) + ")\n")
+            m2p_text.write(pres + "node.hide = %s\n" % tree_node.hide)
+
+            # node with parent is special, this node is offset by their parent frame's location
+            parent_loc = Vector((0, 0))
+            if tree_node.parent != None:
+                parent_loc = tree_node.parent.location
+            m2p_text.write(pres + "node.location = (%.3f, %.3f)\n" % \
+                (tree_node.location.x+parent_loc.x, tree_node.location.y+parent_loc.y))
+
             # Node Group shader node?
             if tree_node.bl_idname == 'ShaderNodeGroup':
                 # get node tree for creating Node Group shader node
-                m2p_text.write(pres + "node.node_tree = bpy.data.node_groups.get(\"" + tree_node.node_tree.name + "\")\n")
+                m2p_text.write(pres + "node.node_tree = bpy.data.node_groups.get(\""+tree_node.node_tree.name+"\")\n")
+            # check for node properties, other than those found in the node 'inputs' and 'outputs'
+            # TODO node types to add/check here: ShaderNodeMapping, ShaderNodeRGBCurve, ShaderNodeValToRGB, ShaderNodeVectorCurve
             else:
-                # Image Texture or Environment Texture node: get image if available
-                if tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and tree_node.image != None:
-                    m2p_text.write(pres + "node.image = bpy.data.images.get(\"%s\")\n" % tree_node.image.name)
-                # Math operation
-                if tree_node.bl_idname in ['ShaderNodeMath', 'ShaderNodeVectorMath']:
-                    m2p_text.write(pres + "node.operation = \"%s\"\n" % tree_node.operation)
                 # Attribute Name
                 if tree_node.bl_idname in ['ShaderNodeAttribute']:
                     m2p_text.write(pres + "node.attribute_name = \"%s\"\n" % tree_node.attribute_name)
+                # Axis
+                if tree_node.bl_idname in ['ShaderNodeTangent']:
+                    m2p_text.write(pres + "node.axis = \"%s\"\n" % tree_node.axis)
+                # Blend Type
+                if tree_node.bl_idname in ['ShaderNodeMixRGB']:
+                    m2p_text.write(pres + "node.blend_type = \"%s\"\n" % tree_node.blend_type)
+                # Coloring
+                if tree_node.bl_idname in ['ShaderNodeTexVoronoi']:
+                    m2p_text.write(pres + "node.coloring = \"%s\"\n" % tree_node.coloring)
+                # Color Space
+                if tree_node.bl_idname in ['ShaderNodeTexEnvironment']:
+                    m2p_text.write(pres + "node.color_space = \"%s\"\n" % tree_node.color_space)
+                # Component
+                if tree_node.bl_idname in ['ShaderNodeBsdfHair', 'ShaderNodeBsdfToon']:
+                    m2p_text.write(pres + "node.component = \"%s\"\n" % tree_node.component)
+                # Convert From
+                if tree_node.bl_idname in ['ShaderNodeVectorTransform']:
+                    m2p_text.write(pres + "node.convert_from = \"%s\"\n" % tree_node.convert_from)
+                # Convert To
+                if tree_node.bl_idname in ['ShaderNodeVectorTransform']:
+                    m2p_text.write(pres + "node.convert_to = \"%s\"\n" % tree_node.convert_to)
+                # Direction Type
+                if tree_node.bl_idname in ['ShaderNodeTangent']:
+                    m2p_text.write(pres + "node.direction_type = \"%s\"\n" % tree_node.direction_type)
+                # Distribution
+                if tree_node.bl_idname in ['ShaderNodeBsdfAnisotropic', 'ShaderNodeBsdfGlass', 'ShaderNodeBsdfGlossy',
+                                           'ShaderNodeBsdfPrincipled', 'ShaderNodeBsdfRefraction']:
+                    m2p_text.write(pres + "node.distribution = \"%s\"\n" % tree_node.distribution)
+                # Extension
+                if tree_node.bl_idname in ['ShaderNodeTexImage']:
+                    m2p_text.write(pres + "node.extension = \"%s\"\n" % tree_node.extension)
+                # Falloff
+                if tree_node.bl_idname in ['ShaderNodeSubsurfaceScattering']:
+                    m2p_text.write(pres + "node.falloff = \"%s\"\n" % tree_node.falloff)
+                # Frequency
+                if tree_node.bl_idname in ['ShaderNodeTexBrick']:
+                    m2p_text.write(pres + "node.offset_frequency = %f\n" % tree_node.offset_frequency)
+                # From Duplicate
+                if tree_node.bl_idname in ['ShaderNodeTexCoord', 'ShaderNodeUVMap']:
+                    m2p_text.write(pres + "node.from_dupli = %s\n" % tree_node.from_dupli)
+                # Gradient Type
+                if tree_node.bl_idname in ['ShaderNodeTexGradient']:
+                    m2p_text.write(pres + "node.gradient_type = \"%s\"\n" % tree_node.gradient_type)
+                # Ground Albedo
+                if tree_node.bl_idname in ['ShaderNodeTexSky']:
+                    m2p_text.write(pres + "node.ground_albedo = %f\n" % tree_node.ground_albedo)
+                # Image Texture or Environment Texture node: get image if available
+                if tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and tree_node.image != None:
+                    m2p_text.write(pres + "node.image = bpy.data.images.get(\"%s\")\n" % tree_node.image.name)
+                # Interpolation
+                if tree_node.bl_idname in ['ShaderNodeTexEnvironment', 'ShaderNodeTexPointDensity']:
+                    m2p_text.write(pres + "node.interpolation = \"%s\"\n" % tree_node.interpolation)
+                # Invert
+                if tree_node.bl_idname in ['ShaderNodeBump']:
+                    m2p_text.write(pres + "node.invert = %s\n" % tree_node.invert)
+                # Musgrave Type
+                if tree_node.bl_idname in ['ShaderNodeTexMusgrave']:
+                    m2p_text.write(pres + "node.musgrave_type = \"%s\"\n" % tree_node.musgrave_type)
+                # Mode
+                if tree_node.bl_idname in ['ShaderNodeScript']:
+                    m2p_text.write(pres + "node.mode = \"%s\"\n" % tree_node.mode)
+                # Object
+                if tree_node.bl_idname in ['ShaderNodeTexCoord', 'ShaderNodeTexPointDensity']:
+                    if tree_node.object != None:
+                        m2p_text.write(pres + "node.object = bpy.data.objects.get(\"%s\")\n" % tree_node.object.name)
+                # Offset
+                if tree_node.bl_idname in ['ShaderNodeTexBrick']:
+                    m2p_text.write(pres + "node.offset = %f\n" % tree_node.offset)
+                # Operation
+                if tree_node.bl_idname in ['ShaderNodeMath', 'ShaderNodeVectorMath']:
+                    m2p_text.write(pres + "node.operation = \"%s\"\n" % tree_node.operation)
+                # Particle Color Source
+                if tree_node.bl_idname in ['ShaderNodeTexPointDensity']:
+                    m2p_text.write(pres + "node.particle_color_source = \"%s\"\n" % tree_node.particle_color_source)
+                # Point Source
+                if tree_node.bl_idname in ['ShaderNodeTexPointDensity']:
+                    m2p_text.write(pres + "node.point_source = \"%s\"\n" % tree_node.point_source)
+                # Projection
+                if tree_node.bl_idname in ['ShaderNodeTexEnvironment']:
+                    m2p_text.write(pres + "node.projection = \"%s\"\n" % tree_node.projection)
+                # Radius
+                if tree_node.bl_idname in ['ShaderNodeTexPointDensity']:
+                    m2p_text.write(pres + "node.radius = %f\n" % tree_node.radius)
+                # Resolution
+                if tree_node.bl_idname in ['ShaderNodeTexPointDensity']:
+                    m2p_text.write(pres + "node.resolution = %f\n" % tree_node.resolution)
+                # Script
+                if tree_node.bl_idname in ['ShaderNodeScript']:
+                    if tree_node.script != None:
+                        m2p_text.write(pres + "node.script = bpy.data.texts.get(\"%s\")\n" % tree_node.script.name)
+                # Sky Type
+                if tree_node.bl_idname in ['ShaderNodeTexSky']:
+                    m2p_text.write(pres + "node.sky_type = \"%s\"\n" % tree_node.sky_type)
+                # Space
+                if tree_node.bl_idname in ['ShaderNodeTexPointDensity', 'ShaderNodeNormalMap']:
+                    m2p_text.write(pres + "node.space = \"%s\"\n" % tree_node.space)
+                # Squash
+                if tree_node.bl_idname in ['ShaderNodeTexBrick']:
+                    m2p_text.write(pres + "node.squash = %f\n" % tree_node.squash)
+                # Squash Frequency
+                if tree_node.bl_idname in ['ShaderNodeTexBrick']:
+                    m2p_text.write(pres + "node.squash_frequency = %f\n" % tree_node.squash_frequency)
+                # Turbidity
+                if tree_node.bl_idname in ['ShaderNodeTexSky']:
+                    m2p_text.write(pres + "node.turbidity = %f\n" % tree_node.turbidity)
+                # Turbulence Depth
+                if tree_node.bl_idname in ['ShaderNodeTexMagic']:
+                    m2p_text.write(pres + "node.turbulence_depth = %f\n" % tree_node.turbulence_depth)
+                # Use Clamp
+                if tree_node.bl_idname in ['ShaderNodeMath', 'ShaderNodeMixRGB']:
+                    m2p_text.write(pres + "node.use_clamp = %s\n" % tree_node.use_clamp)
+                # Use Pixel Size
+                if tree_node.bl_idname in ['ShaderNodeWireframe']:
+                    m2p_text.write(pres + "node.use_pixel_size = %s\n" % tree_node.use_pixel_size)
+                # UV Map
+                if tree_node.bl_idname in ['ShaderNodeNormalMap', 'ShaderNodeTangent', 'ShaderNodeUVMap']:
+                    m2p_text.write(pres + "node.uv_map = \"%s\"\n" % tree_node.uv_map)
+                # Vector Type
+                if tree_node.bl_idname in ['ShaderNodeVectorTransform']:
+                    m2p_text.write(pres + "node.vector_type = \"%s\"\n" % tree_node.vector_type)
+                # Wave Profile
+                if tree_node.bl_idname in ['ShaderNodeTexWave']:
+                    m2p_text.write(pres + "node.wave_profile = \"%s\"\n" % tree_node.wave_profile)
+                # Wave Type
+                if tree_node.bl_idname in ['ShaderNodeTexWave']:
+                    m2p_text.write(pres + "node.wave_type = \"%s\"\n" % tree_node.wave_type)
 
-            # get node inputs default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), ... ]
+            # get node input(s) default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), shader ]
             # TODO: this part needs more testing re: different node input default value(s) and type(s)
-            c = -1
+            input_count = -1
             for node_input in tree_node.inputs:
-                c = c + 1
+                input_count = input_count + 1
                 # ignore virtual sockets and shader sockets, no default
                 if node_input.bl_idname == 'NodeSocketVirtual' or node_input.bl_idname == 'NodeSocketShader':
                     continue
                 # is default value a float type?
                 if isinstance(node_input.default_value, float):
-                    m2p_text.write(pres + "node.inputs["+str(c)+"].default_value = "+str(node_input.default_value)+"\n")
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = "+str(node_input.default_value)+"\n")
                     continue
                 # default value is an tuple/array type
                 for def_val_index in range(len(node_input.default_value)):
-                    m2p_text.write(pres + "node.inputs["+str(c)+"].default_value["+str(def_val_index)+"] = "+str(node_input.default_value[def_val_index])+"\n")
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value["+str(def_val_index)+"] = " + \
+                        str(node_input.default_value[def_val_index])+"\n")
+            # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
+            # TODO: this part needs more testing re: different node output default value(s) and type(s)
+            output_count = -1
+            for node_output in tree_node.outputs:
+                output_count = output_count + 1
+                # ignore virtual sockets and shader sockets, no default
+                if node_output.bl_idname == 'NodeSocketVirtual' or node_output.bl_idname == 'NodeSocketShader':
+                    continue
+                # is default value a float type?
+                if isinstance(node_output.default_value, float):
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = "+str(node_output.default_value)+"\n")
+                    continue
+                # default value is an tuple/array type
+                for def_val_index in range(len(node_output.default_value)):
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value["+str(def_val_index)+"] = " + \
+                        str(node_output.default_value[def_val_index])+"\n")
 
             m2p_text.write(pres + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
+            # save a reference to parent node for later, if parent node exists
+            if tree_node.parent != None:
+                frame_parenting_text = frame_parenting_text + pres + "new_nodes[\"" + tree_node.name + \
+                    "\"].parent = new_nodes[\"" + tree_node.parent.name + "\"]\n"
+
+        # do node parenting if needed
+        if frame_parenting_text != "":
+            m2p_text.write(pres + "# parenting of nodes\n" + frame_parenting_text + "\n")
 
         m2p_text.write(pres + "# links between nodes\n")
         if keep_links:
