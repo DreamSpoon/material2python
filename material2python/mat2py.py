@@ -92,8 +92,14 @@ class Mat2Python(boop.types.Operator):
 
         # write info about the individual nodes
         for tree_node in the_tree_to_use.nodes:
-            m2p_text.write(pres + "node = tree_nodes.new(type=\"" + tree_node.bl_idname + "\")\n")
-            m2p_text.write(pres + "node.name = \"" + tree_node.name + "\"\n")
+            m2p_text.write(pres + "node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
+            m2p_text.write(pres + "node.name = \"%s\"\n" % tree_node.name)
+            m2p_text.write(pres + "node.label = \"%s\"\n" % tree_node.label)
+            m2p_text.write(pres + "node.width = %f\n" % tree_node.width)
+            m2p_text.write(pres + "node.width_hidden = %f\n" % tree_node.width_hidden)
+            m2p_text.write(pres + "node.height = %f\n" % tree_node.height)
+            m2p_text.write(pres + "node.color = (%f, %f, %f)\n" % tuple(tree_node.color))
+            m2p_text.write(pres + "node.use_custom_color = %s\n" % tree_node.use_custom_color)
             m2p_text.write(pres + "node.location = (" + str(round(tree_node.location.x, 3)) + ", " +
                 str(round(tree_node.location.y, 3)) + ")\n")
             # Node Group shader node?
