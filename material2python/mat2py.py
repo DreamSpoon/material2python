@@ -90,21 +90,30 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + "tree_nodes.clear()\n")
         m2p_text.write("\n" + pres + "# material shader nodes\n")
 
+        # write info about the individual nodes
         for tree_node in the_tree_to_use.nodes:
             m2p_text.write(pres + "node = tree_nodes.new(type=\"" + tree_node.bl_idname + "\")\n")
+            m2p_text.write(pres + "node.name = \"" + tree_node.name + "\"\n")
             m2p_text.write(pres + "node.location = (" + str(round(tree_node.location.x, 3)) + ", " +
                 str(round(tree_node.location.y, 3)) + ")\n")
-            print("tree nodely = " + tree_node.name)
+            # Node Group shader node?
+            if tree_node.bl_idname == 'ShaderNodeGroup':
+                # get node tree for creating Node Group shader node
+                m2p_text.write(pres + "node.node_tree = bpy.data.node_groups.get(\"" + tree_node.node_tree.name + "\")\n")
+
+            # get node inputs default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), ... ]
+            # TODO: this part needs more testing re: different node input default value(s) and type(s)
             c = -1
             for node_input in tree_node.inputs:
                 c = c + 1
-                # ignore virtual sockets
-                if node_input.bl_idname == 'NodeSocketVirtual':
+                # ignore virtual sockets and shader sockets, no default
+                if node_input.bl_idname == 'NodeSocketVirtual' or node_input.bl_idname == 'NodeSocketShader':
                     continue
-                print("gotta name it " + node_input.name)
+                # is default value a float type?
                 if isinstance(node_input.default_value, float):
                     m2p_text.write(pres + "node.inputs["+str(c)+"].default_value = "+str(node_input.default_value)+"\n")
                     continue
+                # default value is an tuple/array type
                 for def_val_index in range(len(node_input.default_value)):
                     m2p_text.write(pres + "node.inputs["+str(c)+"].default_value["+str(def_val_index)+"] = "+str(node_input.default_value[def_val_index])+"\n")
 
