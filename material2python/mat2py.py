@@ -66,12 +66,12 @@ class Mat2Python(boop.types.Operator):
                 m2p_text.write("material Node Group named \""+the_tree_to_use.name+"\"\n\nimport bpy\n\n# add nodes and links to node group \n" +
                                "def add_group_nodes(node_group_name):\n")
             else:
-                m2p_text.write("material named \""+mat.id.name+"\"\n\nimport bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
+                m2p_text.write("material named \""+the_tree_to_use.name+"\"\n\nimport bpy\n\n# add nodes and links to material\ndef add_material_nodes(material):\n")
 
         if is_the_tree_in_node_groups:
             m2p_text.write(pres + "# initialize variables\n")
             m2p_text.write(pres + "new_nodes = {}\n")
-            m2p_text.write(pres + "new_node_group = bpy.data.node_groups.new(name=\""+the_tree_to_use.name+"\", type='"+
+            m2p_text.write(pres + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='"+
                            the_tree_to_use.bl_idname+"')\n")
             # get the node group inputs and outputs
             for ng_input in node_group.inputs:

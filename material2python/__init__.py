@@ -67,7 +67,9 @@ def register():
     bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader",
         description="Include code in the output that delete all nodes in World Shader Material", default=True)
     bts.M2P_UseEditTree = bp.BoolProperty(name="Use Edit Tree",
-        description="Use the node tree of the currently displayed (edit_tree) Shader node editor", default=True)
+        description="Use node tree currently displayed (edit_tree) in the Shader node editor. To capture custom " +
+            "Node Group, enable this option and use 'Material to Python' button while viewing the custom Node Group",
+            default=True)
 
 def unregister():
     boop.utils.unregister_class(Mat2Python)
