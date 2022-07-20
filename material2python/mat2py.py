@@ -24,7 +24,7 @@ M2P_TEXT_NAME = "m2pText"
 class Mat2Python(boop.types.Operator):
     """Make Python text-block from current Material/Geometry node tree"""
     bl_idname = "major.awesome"
-    bl_label = "Nodes to Python"
+    bl_label = "Nodes 2 Python"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
