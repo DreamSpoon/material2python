@@ -18,12 +18,12 @@
 
 bl_info = {
     "name": "Material 2 Python",
-    "description": "Convert material nodes to Python text-block.",
+    "description": "Convert material/geometry nodes to Python text-block.",
     "author": "Dave",
-    "version": (0, 0, 2),
+    "version": (0, 1, 0),
     "blender": (2, 80, 0),
-    "location": "Material Shader Nodes",
-    "category": "Material",
+    "location": "Material Shader Nodes / Geometry Shader Nodes",
+    "category": "Developer",
 }
 
 import bpy as boop
@@ -65,7 +65,7 @@ def register():
     bts.M2P_MakeFunction = bp.BoolProperty(name="Make into Function", description="Add lines of python code to " +
         "create runnable script (instead of just the bare essential code)", default=True)
     bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader",
-        description="Include code in the output that delete all nodes in World Shader Material", default=True)
+        description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup before creating new nodes", default=True)
     bts.M2P_UseEditTree = bp.BoolProperty(name="Use Edit Tree",
         description="Use node tree currently displayed (edit_tree) in the Shader node editor. To capture custom " +
             "Node Group, enable this option and use 'Material to Python' button while viewing the custom Node Group",

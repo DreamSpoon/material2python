@@ -22,16 +22,16 @@ from mathutils import Vector
 M2P_TEXT_NAME = "m2pText"
 
 class Mat2Python(boop.types.Operator):
-    """Make Python text-block from current Material node tree"""
+    """Make Python text-block from current Material/Geometry node tree"""
     bl_idname = "major.awesome"
-    bl_label = "Material to Python"
+    bl_label = "Nodes to Python"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, fun):
         s = fun.space_data
         if s.type == 'NODE_EDITOR' and s.node_tree != None and \
-            s.tree_type in ("CompositorNodeTree", "ShaderNodeTree", "TextureNodeTree"):
+            s.tree_type in ("CompositorNodeTree", "ShaderNodeTree", "TextureNodeTree", "GeometryNodeTree"):
             return True
         return False
 
@@ -120,7 +120,8 @@ class Mat2Python(boop.types.Operator):
                 # get node tree for creating Node Group shader node
                 m2p_text.write(pres + "node.node_tree = bpy.data.node_groups.get(\""+tree_node.node_tree.name+"\")\n")
             # check for node properties, other than those found in the node 'inputs' and 'outputs'
-            # TODO node types to add/check here: ShaderNodeMapping, ShaderNodeRGBCurve, ShaderNodeValToRGB, ShaderNodeVectorCurve
+            # TODO node types to add/check here: ShaderNodeMapping, ShaderNodeRGBCurve, ShaderNodeValToRGB,
+            #                                    ShaderNodeVectorCurve
             else:
                 # Attribute Name
                 if tree_node.bl_idname in ['ShaderNodeAttribute']:
@@ -172,7 +173,8 @@ class Mat2Python(boop.types.Operator):
                 if tree_node.bl_idname in ['ShaderNodeTexSky']:
                     m2p_text.write(pres + "node.ground_albedo = %f\n" % tree_node.ground_albedo)
                 # Image Texture or Environment Texture node: get image if available
-                if tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and tree_node.image != None:
+                if tree_node.bl_idname in ['ShaderNodeTexImage', 'ShaderNodeTexEnvironment'] and \
+                        tree_node.image != None:
                     m2p_text.write(pres + "node.image = bpy.data.images.get(\"%s\")\n" % tree_node.image.name)
                 # Interpolation
                 if tree_node.bl_idname in ['ShaderNodeTexEnvironment', 'ShaderNodeTexPointDensity']:
@@ -260,14 +262,21 @@ class Mat2Python(boop.types.Operator):
                 # ignore virtual sockets and shader sockets, no default
                 if node_input.bl_idname == 'NodeSocketVirtual' or node_input.bl_idname == 'NodeSocketShader':
                     continue
+                # if node doesn't have attribute 'default_value', then cannot save the value - so continue
+                if not hasattr(node_input, 'default_value'):
+                    continue
                 # is default value a float type?
                 if isinstance(node_input.default_value, float):
-                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = "+str(node_input.default_value)+"\n")
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = " + \
+                                   str(node_input.default_value)+"\n")
+                    continue
+                # skip to next input if 'default_value' is not a list/tuple
+                if not isinstance(node_input.default_value, (list, tuple)):
                     continue
                 # default value is an tuple/array type
                 for def_val_index in range(len(node_input.default_value)):
-                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value["+str(def_val_index)+"] = " + \
-                        str(node_input.default_value[def_val_index])+"\n")
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value["+str(def_val_index) + \
+                                   "] = "+str(node_input.default_value[def_val_index])+"\n")
             # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
             # TODO: this part needs more testing re: different node output default value(s) and type(s)
             output_count = -1
@@ -276,14 +285,21 @@ class Mat2Python(boop.types.Operator):
                 # ignore virtual sockets and shader sockets, no default
                 if node_output.bl_idname == 'NodeSocketVirtual' or node_output.bl_idname == 'NodeSocketShader':
                     continue
+                # if node doesn't have attribute 'default_value', then cannot save the value - so continue
+                if not hasattr(node_output, 'default_value'):
+                    continue
                 # is default value a float type?
                 if isinstance(node_output.default_value, float):
-                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = "+str(node_output.default_value)+"\n")
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = " + \
+                                   str(node_output.default_value)+"\n")
+                    continue
+                # skip to next input if 'default_value' is not a list/tuple
+                if not isinstance(node_output.default_value, (list, tuple)):
                     continue
                 # default value is an tuple/array type
                 for def_val_index in range(len(node_output.default_value)):
-                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value["+str(def_val_index)+"] = " + \
-                        str(node_output.default_value[def_val_index])+"\n")
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value["+str(def_val_index) + \
+                                   "] = "+str(node_output.default_value[def_val_index])+"\n")
 
             m2p_text.write(pres + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
             # save a reference to parent node for later, if parent node exists
@@ -318,7 +334,7 @@ class Mat2Python(boop.types.Operator):
                 m2p_text.write("# use python script to add nodes, and links between nodes, to new Node Group\n" +
                                "add_group_nodes('"+the_tree_to_use.name+"')\n")
             else:
-                m2p_text.write("# use python script to add nodes, and links between nodes, to the active material of " +
+                m2p_text.write("# use python script to add nodes, and links between nodes, to the active material of "+
                                "the active object\nobj = bpy.context.active_object\n" +
                                "if obj != None and obj.active_material != None:\n" +
                                "    add_material_nodes(obj.active_material)\n")
