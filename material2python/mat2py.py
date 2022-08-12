@@ -16,48 +16,68 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import bpy as boop
+import bpy
 from mathutils import Vector
+from mathutils import Color
 
 M2P_TEXT_NAME = "m2pText"
 
-class Mat2Python(boop.types.Operator):
+uni_attr_default_list = {
+    "name": "",
+    "label": "",
+    "width": 0.0,
+    "width_hidden": 42.0,
+    "height": 100.0,
+    "color": Color((0.608000, 0.608000, 0.608000)),
+    "use_custom_color": False,
+    "mute": False,
+    "hide": False,
+}
+
+WRITE_DEFAULTS_UNI_NODE_OPT = "write_defaults"
+LOC_DEC_PLACES_UNI_NODE_OPT = "loc_decimal_places"
+
+class M2P_CreateText(bpy.types.Operator):
     """Make Python text-block from current Material/Geometry node tree"""
-    bl_idname = "major.awesome"
+    bl_idname = "mat2py.awesome"
     bl_label = "Nodes 2 Python"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
-    def poll(cls, fun):
-        s = fun.space_data
+    def poll(cls, context):
+        s = context.space_data
         if s.type == 'NODE_EDITOR' and s.node_tree != None and \
             s.tree_type in ("CompositorNodeTree", "ShaderNodeTree", "TextureNodeTree", "GeometryNodeTree"):
             return True
         return False
 
-    def execute(self, fun):
-        fs = fun.scene
-        self.do_it(fun, fs.M2P_NumSpacePad, fs.M2P_KeepLinks, fs.M2P_MakeFunction, fs.M2P_DeleteExisting,
-            fs.M2P_UseEditTree)
+    def execute(self, context):
+        scn = context.scene
+        uni_node_options = {
+            LOC_DEC_PLACES_UNI_NODE_OPT: scn.M2P_WriteLocDecimalPlaces,
+            WRITE_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteDefaults,
+        }
+        self.create_code_text(context, scn.M2P_NumSpacePad, scn.M2P_KeepLinks, scn.M2P_MakeFunction, scn.M2P_DeleteExisting,
+            scn.M2P_UseEditTree, uni_node_options)
         return {'FINISHED'}
 
     @classmethod
-    def do_it(cls, fun, space_pad, keep_links, make_into_function, delete_existing, use_edit_tree):
+    def create_code_text(cls, context, space_pad, keep_links, make_into_function, delete_existing, use_edit_tree, uni_node_options):
         pres = ""
         if isinstance(space_pad, int):
             pres = " " * space_pad
         elif isinstance(space_pad, str):
             pres = space_pad
 
-        mat = fun.space_data
+        mat = context.space_data
 
-        m2p_text = boop.data.texts.new(M2P_TEXT_NAME)
+        m2p_text = bpy.data.texts.new(M2P_TEXT_NAME)
 
         the_tree_to_use = mat.node_tree
         if use_edit_tree:
             the_tree_to_use = mat.edit_tree
 
-        node_group = boop.data.node_groups.get(the_tree_to_use.name)
+        node_group = bpy.data.node_groups.get(the_tree_to_use.name)
         is_the_tree_in_node_groups = (node_group != None)
 
         m2p_text.write("# Blender Python script to re-create ")
@@ -81,7 +101,7 @@ class Mat2Python(boop.types.Operator):
                 m2p_text.write(pres + "new_node_group.outputs.new(type='"+ng_output.bl_socket_idname+"', name=\"" +
                                ng_output.name+"\")\n")
 
-            m2p_text.write(pres + "tree_nodes = new_node_group.nodes")
+            m2p_text.write(pres + "tree_nodes = new_node_group.nodes\n")
         else:
             m2p_text.write(pres + "# initialize variables\n")
             m2p_text.write(pres + "new_nodes = {}\n")
@@ -92,28 +112,47 @@ class Mat2Python(boop.types.Operator):
             m2p_text.write(pres + "tree_nodes.clear()\n")
         m2p_text.write("\n" + pres + "# material shader nodes\n")
 
+        write_default_values = uni_node_options[WRITE_DEFAULTS_UNI_NODE_OPT]
+
         # set parenting order of nodes (e.g. parenting to frames) after creating all the nodes in the tree,
         # so that parent nodes are referenced only after parent nodes are created
         frame_parenting_text = ""
         # write info about the individual nodes
         for tree_node in the_tree_to_use.nodes:
             m2p_text.write(pres + "node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
-            m2p_text.write(pres + "node.name = \"%s\"\n" % tree_node.name)
-            m2p_text.write(pres + "node.label = \"%s\"\n" % tree_node.label)
-            m2p_text.write(pres + "node.width = %f\n" % tree_node.width)
-            m2p_text.write(pres + "node.width_hidden = %f\n" % tree_node.width_hidden)
-            m2p_text.write(pres + "node.height = %f\n" % tree_node.height)
-            m2p_text.write(pres + "node.color = (%f, %f, %f)\n" % tuple(tree_node.color))
-            m2p_text.write(pres + "node.use_custom_color = %s\n" % tree_node.use_custom_color)
-            m2p_text.write(pres + "node.mute = %s\n" % tree_node.mute)
-            m2p_text.write(pres + "node.hide = %s\n" % tree_node.hide)
+            for attr in uni_attr_default_list:
+                if hasattr(tree_node, attr):
+                    gotten_attr = getattr(tree_node, attr)
+                    # if write defaults is not enabled, and a default value is found, then skip the default value
+                    if not write_default_values and gotten_attr == uni_attr_default_list[attr]:
+                        continue
+
+                    if isinstance(gotten_attr, int):
+                        m2p_text.write(pres + "node."+attr+" = %d\n" % gotten_attr)
+                    elif isinstance(gotten_attr, float):
+                        m2p_text.write(pres + "node."+attr+" = %f\n" % gotten_attr)
+                    elif isinstance(gotten_attr, Color):
+                        m2p_text.write(pres + "node."+attr+" = (%f, %f, %f)\n" % (gotten_attr[0], gotten_attr[1],
+                                                                                  gotten_attr[2]))
+                    elif isinstance(gotten_attr, Vector):
+                        m2p_text.write(pres + "node."+attr+" = (%f, %f, %f)\n" % (gotten_attr[0], gotten_attr[1],
+                                                                                  gotten_attr[2]))
+                    elif isinstance(gotten_attr, str):
+                        m2p_text.write(pres + "node."+attr+" = \"%s\"\n" % gotten_attr)
+                    # unknown type, try to convert to string (without quotes) as final option
+                    else:
+                        m2p_text.write(pres + "node."+attr+" = %s\n" % str(gotten_attr))
 
             # node with parent is special, this node is offset by their parent frame's location
             parent_loc = Vector((0, 0))
             if tree_node.parent != None:
                 parent_loc = tree_node.parent.location
-            m2p_text.write(pres + "node.location = (%.3f, %.3f)\n" % \
-                (tree_node.location.x+parent_loc.x, tree_node.location.y+parent_loc.y))
+
+            # do rounding of location values, if needed, and write the values
+            precision = uni_node_options[LOC_DEC_PLACES_UNI_NODE_OPT]
+            loc_x = tree_node.location.x+parent_loc.x
+            loc_y = tree_node.location.y+parent_loc.y
+            m2p_text.write(pres + "node.location = (%0.*f, %0.*f)\n" % (precision, loc_x, precision, loc_y))
 
             # Node Group shader node?
             if tree_node.bl_idname == 'ShaderNodeGroup':
@@ -326,15 +365,14 @@ class Mat2Python(boop.types.Operator):
                 "\"].outputs[" + str(cls.get_output_num_for_link(tree_link)) + "], new_nodes[\"" +
                 tree_link.to_socket.node.name + "\"].inputs[" + str(cls.get_input_num_for_link(tree_link)) + "])\n")
             if keep_links:
-                m2p_text.write(pres + "new_links.append(link)\n\n")
+                m2p_text.write(pres + "new_links.append(link)\n")
 
         if make_into_function:
             if is_the_tree_in_node_groups:
-                #m2p_text.write("add_group_nodes('"+the_tree_to_use.name+"'):\n")
-                m2p_text.write("# use python script to add nodes, and links between nodes, to new Node Group\n" +
+                m2p_text.write("\n# use python script to add nodes, and links between nodes, to new Node Group\n" +
                                "add_group_nodes('"+the_tree_to_use.name+"')\n")
             else:
-                m2p_text.write("# use python script to add nodes, and links between nodes, to the active material of "+
+                m2p_text.write("\n# use python script to add nodes, and links between nodes, to the active material of "+
                                "the active object\nobj = bpy.context.active_object\n" +
                                "if obj != None and obj.active_material != None:\n" +
                                "    add_material_nodes(obj.active_material)\n")
