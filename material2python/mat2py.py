@@ -35,7 +35,10 @@ uni_attr_default_list = {
 }
 
 WRITE_DEFAULTS_UNI_NODE_OPT = "write_defaults"
+WRITE_LINKED_DEFAULTS_UNI_NODE_OPT = "write_linked_defaults"
 LOC_DEC_PLACES_UNI_NODE_OPT = "loc_decimal_places"
+WRITE_ATTR_NAME_UNI_NODE_OPT = "write_attr_name"
+WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT = "write_attr_width_height"
 
 class M2P_CreateText(bpy.types.Operator):
     """Make Python text-block from current Material/Geometry node tree"""
@@ -55,7 +58,10 @@ class M2P_CreateText(bpy.types.Operator):
         scn = context.scene
         uni_node_options = {
             LOC_DEC_PLACES_UNI_NODE_OPT: scn.M2P_WriteLocDecimalPlaces,
-            WRITE_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteDefaults,
+            WRITE_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteDefaultValues,
+            WRITE_LINKED_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteLinkedDefaultValues,
+            WRITE_ATTR_NAME_UNI_NODE_OPT: scn.M2P_WriteAttribName,
+            WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: scn.M2P_WriteAttribWidthAndHeight,
         }
         self.create_code_text(context, scn.M2P_NumSpacePad, scn.M2P_KeepLinks, scn.M2P_MakeFunction, scn.M2P_DeleteExisting,
             scn.M2P_UseEditTree, uni_node_options)
@@ -110,9 +116,26 @@ class M2P_CreateText(bpy.types.Operator):
         if delete_existing:
             m2p_text.write(pres + "# delete all nodes\n")
             m2p_text.write(pres + "tree_nodes.clear()\n")
-        m2p_text.write("\n" + pres + "# material shader nodes\n")
+        m2p_text.write("\n" + pres + "# create nodes\n")
 
-        write_default_values = uni_node_options[WRITE_DEFAULTS_UNI_NODE_OPT]
+        # create dictionaries of used input and output sockets, based on node tree's links,
+        # to be used later to filter (reduce number of) input/output socket default values
+        linked_node_inputs = {}
+        linked_node_outputs = {}
+        for tree_link in the_tree_to_use.links:
+            # get used input list of the 'to' node
+            used_inputs_list =  linked_node_inputs.get(tree_link.to_socket.node.name)
+            if used_inputs_list is None:
+                linked_node_inputs[tree_link.to_socket.node.name] = [cls.get_input_num_for_link(tree_link)]
+            else:
+                used_inputs_list.append(cls.get_input_num_for_link(tree_link))
+            # get used outputs list of the 'from' node
+            used_outputs_list =  linked_node_outputs.get(tree_link.from_socket.node.name)
+            if used_outputs_list is None:
+                linked_node_outputs[tree_link.from_socket.node.name] = [cls.get_output_num_for_link(tree_link)]
+            else:
+                used_outputs_list.append(cls.get_output_num_for_link(tree_link))
+
 
         # set parenting order of nodes (e.g. parenting to frames) after creating all the nodes in the tree,
         # so that parent nodes are referenced only after parent nodes are created
@@ -124,7 +147,14 @@ class M2P_CreateText(bpy.types.Operator):
                 if hasattr(tree_node, attr):
                     gotten_attr = getattr(tree_node, attr)
                     # if write defaults is not enabled, and a default value is found, then skip the default value
-                    if not write_default_values and gotten_attr == uni_attr_default_list[attr]:
+                    if not uni_node_options[WRITE_DEFAULTS_UNI_NODE_OPT] and gotten_attr == uni_attr_default_list[attr]:
+                        continue
+                    # if not writing 'name' then skip
+                    elif attr == 'name' and uni_node_options[WRITE_ATTR_NAME_UNI_NODE_OPT] == False:
+                        continue
+                    # if not writing width and height then skip
+                    elif (attr == 'width' or attr == 'height') and \
+                            uni_node_options[WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT] == False:
                         continue
 
                     if isinstance(gotten_attr, int):
@@ -304,10 +334,25 @@ class M2P_CreateText(bpy.types.Operator):
                 # if node doesn't have attribute 'default_value', then cannot save the value - so continue
                 if not hasattr(node_input, 'default_value'):
                     continue
+
+                # if 'do not write linked default values', and this input socket is used (i.e. 'linked') then skip
+                if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False:
+                    used_list = linked_node_inputs.get(tree_node.name)
+                    if used_list != None and input_count in used_list:
+                        continue
+
                 # is default value a float type?
                 if isinstance(node_input.default_value, float):
                     m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = " + \
                                    str(node_input.default_value)+"\n")
+                    continue
+                # is default value a Color or Vector type?
+                if isinstance(node_input.default_value, Color) or isinstance(node_input.default_value, Vector) and \
+                        len(node_input.default_value) == 3:
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = (%f, %f, %f)\n" %
+                                   (node_input.default_value[0],
+                                    node_input.default_value[1],
+                                    node_input.default_value[2]))
                     continue
                 # skip to next input if 'default_value' is not a list/tuple
                 if not isinstance(node_input.default_value, (list, tuple)):
@@ -327,12 +372,25 @@ class M2P_CreateText(bpy.types.Operator):
                 # if node doesn't have attribute 'default_value', then cannot save the value - so continue
                 if not hasattr(node_output, 'default_value'):
                     continue
+                # if 'do not write linked default values', and this output socket is used (i.e. 'linked') then skip
+                if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False:
+                    used_list = linked_node_outputs.get(tree_node.name)
+                    if used_list != None and output_count in used_list:
+                        continue
                 # is default value a float type?
                 if isinstance(node_output.default_value, float):
                     m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = " + \
                                    str(node_output.default_value)+"\n")
                     continue
-                # skip to next input if 'default_value' is not a list/tuple
+                # is default value a Color or Vector type?
+                if (isinstance(node_output.default_value, Color) or isinstance(node_output.default_value, Vector)) and\
+                        len(node_output.default_value) == 3:
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = (%f, %f, %f)\n" %
+                                   (node_output.default_value[0],
+                                    node_output.default_value[1],
+                                    node_output.default_value[2]))
+                    continue
+                # skip to next output if 'default_value' is not a list/tuple
                 if not isinstance(node_output.default_value, (list, tuple)):
                     continue
                 # default value is an tuple/array type
@@ -350,13 +408,13 @@ class M2P_CreateText(bpy.types.Operator):
         if frame_parenting_text != "":
             m2p_text.write(pres + "# parenting of nodes\n" + frame_parenting_text + "\n")
 
-        m2p_text.write(pres + "# links between nodes\n")
+        m2p_text.write(pres + "# create links\n")
         if keep_links:
             m2p_text.write(pres + "new_links = []\n")
         if is_the_tree_in_node_groups:
-            m2p_text.write(pres + "tree_links = new_node_group.links\n\n")
+            m2p_text.write(pres + "tree_links = new_node_group.links\n")
         else:
-            m2p_text.write(pres + "tree_links = material.node_tree.links\n\n")
+            m2p_text.write(pres + "tree_links = material.node_tree.links\n")
         for tree_link in the_tree_to_use.links:
             flint = ""
             if keep_links:
@@ -372,13 +430,15 @@ class M2P_CreateText(bpy.types.Operator):
                 m2p_text.write("\n# use python script to add nodes, and links between nodes, to new Node Group\n" +
                                "add_group_nodes('"+the_tree_to_use.name+"')\n")
             else:
-                m2p_text.write("\n# use python script to add nodes, and links between nodes, to the active material of "+
-                               "the active object\nobj = bpy.context.active_object\n" +
+                m2p_text.write("\n# use python script to add nodes, and links between nodes, to the active material " +
+                               "of the active object\nobj = bpy.context.active_object\n" +
                                "if obj != None and obj.active_material != None:\n" +
                                "    add_material_nodes(obj.active_material)\n")
         # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
+        # TODO: fix this, not working in Blender 3.1
         m2p_text.current_line_index = 0
 
+    # TODO: take the following two functions out of this class
     @classmethod
     def get_input_num_for_link(cls, tr_link):
         for c in range(0, len(tr_link.to_socket.node.inputs)):

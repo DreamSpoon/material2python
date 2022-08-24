@@ -47,13 +47,22 @@ class M2P_PT_MaterialToPython(bpy.types.Panel):
         layout = self.layout
         box = layout.box()
         box.operator("mat2py.awesome")
+        box = layout.box()
+        box.label(text="Options")
         box.prop(scn, "M2P_NumSpacePad")
         box.prop(scn, "M2P_KeepLinks")
         box.prop(scn, "M2P_MakeFunction")
         box.prop(scn, "M2P_DeleteExisting")
         box.prop(scn, "M2P_UseEditTree")
-        box.prop(scn, "M2P_WriteDefaults")
+        box = layout.box()
+        box.label(text="Write Attributes")
+        box.prop(scn, "M2P_WriteAttribName")
+        box.prop(scn, "M2P_WriteAttribWidthAndHeight")
         box.prop(scn, "M2P_WriteLocDecimalPlaces")
+        box = layout.box()
+        box.label(text="Write Defaults")
+        box.prop(scn, "M2P_WriteDefaultValues")
+        box.prop(scn, "M2P_WriteLinkedDefaultValues")
 
 def register():
     bpy.utils.register_class(M2P_PT_MaterialToPython)
@@ -73,15 +82,32 @@ def register():
     bts.M2P_UseEditTree = bp.BoolProperty(name="Use Edit Tree",
         description="Use node tree currently displayed (edit_tree) in the Shader node editor. To capture custom " +
             "Node Group, enable this option and use 'Material to Python' button while viewing the custom Node Group",
-            default=True)
-    bts.M2P_WriteDefaults = bp.BoolProperty(name="Write Defaults", description="Include attributes of nodes that have default values",
-            default=False)
+        default=True)
+    bts.M2P_WriteDefaultValues = bp.BoolProperty(name="Write Defaults", description="Include attributes of nodes " +
+        "that have default values", default=False)
     bts.M2P_WriteLocDecimalPlaces = bp.IntProperty(name="Location Decimal Places", description="Number of " +
         "decimal places to use when writing location values", default=0)
+
+    bts.M2P_WriteLinkedDefaultValues = bp.BoolProperty(name="Linked Default Values", description="Desc", default=False)
+    bts.M2P_WriteAttribName = bp.BoolProperty(name="Name", description="Include node attribute 'name'", default=False)
+    bts.M2P_WriteAttribWidthAndHeight = bp.BoolProperty(name="Width and Height", description="Include node " +
+        "attributes for width and height", default=False)
 
 def unregister():
     bpy.utils.unregister_class(M2P_CreateText)
     bpy.utils.unregister_class(M2P_PT_MaterialToPython)
+
+    bts = bpy.types.Scene
+    del bts.M2P_WriteAttribWidthAndHeight
+    del bts.M2P_WriteAttribName
+    del bts.M2P_WriteLinkedDefaultValues
+    del bts.M2P_WriteLocDecimalPlaces
+    del bts.M2P_WriteDefaultValues
+    del bts.M2P_UseEditTree
+    del bts.M2P_DeleteExisting
+    del bts.M2P_MakeFunction
+    del bts.M2P_KeepLinks
+    del bts.M2P_NumSpacePad
 
 if __name__ == "__main__":
     register()
