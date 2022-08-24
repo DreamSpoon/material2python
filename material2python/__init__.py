@@ -72,8 +72,8 @@ def register():
     bp = bpy.props
     bts.M2P_NumSpacePad = bp.IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
         "line of code output in text-block", default=4, min=0)
-    bts.M2P_KeepLinks = bp.BoolProperty(name="Keep Links", description="Add created links to a list variable",
-        default=True)
+    bts.M2P_KeepLinks = bp.BoolProperty(name="Keep Links List", description="Add created links to a list variable",
+        default=False)
     bts.M2P_MakeFunction = bp.BoolProperty(name="Make into Function", description="Add lines of python code to " +
         "create runnable script (instead of just the bare essential code)", default=True)
     bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader",

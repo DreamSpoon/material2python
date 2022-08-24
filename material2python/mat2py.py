@@ -40,6 +40,10 @@ LOC_DEC_PLACES_UNI_NODE_OPT = "loc_decimal_places"
 WRITE_ATTR_NAME_UNI_NODE_OPT = "write_attr_name"
 WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT = "write_attr_width_height"
 
+# add escape characters to backslashes and double-quote chars in given string
+def esc_char_string(in_str):
+    return in_str.replace('\\', '\\\\').replace('"', '\\"')
+
 class M2P_CreateText(bpy.types.Operator):
     """Make Python text-block from current Material/Geometry node tree"""
     bl_idname = "mat2py.awesome"
@@ -322,6 +326,14 @@ class M2P_CreateText(bpy.types.Operator):
                 # Wave Type
                 if tree_node.bl_idname in ['ShaderNodeTexWave']:
                     m2p_text.write(pres + "node.wave_type = \"%s\"\n" % tree_node.wave_type)
+                # Input Vector Type
+                if tree_node.bl_idname in ['FunctionNodeInputVector']:
+                    vec_str = ""
+                    for def_val_index in range(len(tree_node.vector)):
+                        if vec_str != "":
+                            vec_str = vec_str+", "
+                        vec_str = vec_str+str(tree_node.vector[def_val_index])
+                    m2p_text.write(pres + "node.vector = ("+vec_str+")\n")
 
             # get node input(s) default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), shader ]
             # TODO: this part needs more testing re: different node input default value(s) and type(s)
@@ -339,18 +351,23 @@ class M2P_CreateText(bpy.types.Operator):
                     used_list = linked_node_inputs.get(tree_node.name)
                     if used_list != None and input_count in used_list:
                         continue
-                # is default value a float type?
-                if isinstance(node_input.default_value, float):
+                # is default value a float/int/bool type?
+                if isinstance(node_input.default_value, (float, int, bool)):
                     m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = " + \
                                    str(node_input.default_value)+"\n")
-                    continue
+                # is default value a string type?
+                elif isinstance(node_input.default_value, str):
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = \"" + \
+                                   esc_char_string(node_input.default_value)+"\"\n")
                 # skip to next input if 'default_value' is not an array/list/tuple
-                if not hasattr(node_input.default_value, '__len__'):
-                    continue
-                # default value is an tuple/array type
-                for def_val_index in range(len(node_input.default_value)):
-                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value["+str(def_val_index) + \
-                                   "] = "+str(node_input.default_value[def_val_index])+"\n")
+                elif hasattr(node_input.default_value, '__len__'):
+                    # default value is an tuple/array type
+                    vec_str = ""
+                    for def_val_index in range(len(node_input.default_value)):
+                        if vec_str != "":
+                            vec_str = vec_str+", "
+                        vec_str = vec_str+str(node_input.default_value[def_val_index])
+                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = ("+vec_str+")\n")
             # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
             # TODO: this part needs more testing re: different node output default value(s) and type(s)
             output_count = -1
@@ -362,23 +379,29 @@ class M2P_CreateText(bpy.types.Operator):
                 # if node doesn't have attribute 'default_value', then cannot save the value - so continue
                 if not hasattr(node_output, 'default_value'):
                     continue
-                # if 'do not write linked default values', and this output socket is used (i.e. 'linked') then skip
-                if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False:
+                # if 'do not write linked default values', and this output socket is used (i.e. 'linked'),
+                # and it is not a Input Value node, then skip
+                if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False and tree_node.bl_idname != 'ShaderNodeValue':
                     used_list = linked_node_outputs.get(tree_node.name)
                     if used_list != None and output_count in used_list:
                         continue
-                # is default value a float type?
-                if isinstance(node_output.default_value, float):
+                # is default value a float/int/bool type?
+                if isinstance(node_output.default_value, (float, int, bool)):
                     m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = " + \
                                    str(node_output.default_value)+"\n")
-                    continue
+                # is default value a string type?
+                elif isinstance(node_output.default_value, str):
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = \"" + \
+                                   esc_char_string(node_output.default_value)+"\"\n")
                 # skip to next output if 'default_value' is not an array/list/tuple
-                if not hasattr(node_output.default_value, '__len__'):
-                    continue
-                # default value is an tuple/list/array type
-                for def_val_index in range(len(node_output.default_value)):
-                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value["+str(def_val_index) + \
-                                   "] = "+str(node_output.default_value[def_val_index])+"\n")
+                elif hasattr(node_output.default_value, '__len__'):
+                    # default value is an tuple/list/array type
+                    vec_str = ""
+                    for def_val_index in range(len(node_output.default_value)):
+                        if vec_str != "":
+                            vec_str = vec_str+", "
+                        vec_str = vec_str+str(node_output.default_value[def_val_index])
+                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = ("+vec_str+")\n")
 
             m2p_text.write(pres + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
             # save a reference to parent node for later, if parent node exists
