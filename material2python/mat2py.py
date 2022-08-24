@@ -334,28 +334,18 @@ class M2P_CreateText(bpy.types.Operator):
                 # if node doesn't have attribute 'default_value', then cannot save the value - so continue
                 if not hasattr(node_input, 'default_value'):
                     continue
-
                 # if 'do not write linked default values', and this input socket is used (i.e. 'linked') then skip
                 if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False:
                     used_list = linked_node_inputs.get(tree_node.name)
                     if used_list != None and input_count in used_list:
                         continue
-
                 # is default value a float type?
                 if isinstance(node_input.default_value, float):
                     m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = " + \
                                    str(node_input.default_value)+"\n")
                     continue
-                # is default value a Color or Vector type?
-                if isinstance(node_input.default_value, Color) or isinstance(node_input.default_value, Vector) and \
-                        len(node_input.default_value) == 3:
-                    m2p_text.write(pres + "node.inputs["+str(input_count)+"].default_value = (%f, %f, %f)\n" %
-                                   (node_input.default_value[0],
-                                    node_input.default_value[1],
-                                    node_input.default_value[2]))
-                    continue
-                # skip to next input if 'default_value' is not a list/tuple
-                if not isinstance(node_input.default_value, (list, tuple)):
+                # skip to next input if 'default_value' is not an array/list/tuple
+                if not hasattr(node_input.default_value, '__len__'):
                     continue
                 # default value is an tuple/array type
                 for def_val_index in range(len(node_input.default_value)):
@@ -382,18 +372,10 @@ class M2P_CreateText(bpy.types.Operator):
                     m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = " + \
                                    str(node_output.default_value)+"\n")
                     continue
-                # is default value a Color or Vector type?
-                if (isinstance(node_output.default_value, Color) or isinstance(node_output.default_value, Vector)) and\
-                        len(node_output.default_value) == 3:
-                    m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value = (%f, %f, %f)\n" %
-                                   (node_output.default_value[0],
-                                    node_output.default_value[1],
-                                    node_output.default_value[2]))
+                # skip to next output if 'default_value' is not an array/list/tuple
+                if not hasattr(node_output.default_value, '__len__'):
                     continue
-                # skip to next output if 'default_value' is not a list/tuple
-                if not isinstance(node_output.default_value, (list, tuple)):
-                    continue
-                # default value is an tuple/array type
+                # default value is an tuple/list/array type
                 for def_val_index in range(len(node_output.default_value)):
                     m2p_text.write(pres + "node.outputs["+str(output_count)+"].default_value["+str(def_val_index) + \
                                    "] = "+str(node_output.default_value[def_val_index])+"\n")
