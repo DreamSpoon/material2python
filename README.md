@@ -9,3 +9,6 @@ Other info, such as default values and color ramp settings, are not captured by 
 This addon may evolve as time goes by to include more info.
 
 Custom Geometry Node Groups can also be saved, just view the custom Geometry Node Group and press the "Nodes 2 Python" button.
+
+Notes:
+- currently, the code to "create function" to run the code doesn't work with Geometry Node Groups - only material shaders.
