@@ -20,7 +20,7 @@ bl_info = {
     "name": "Material 2 Python",
     "description": "Convert material/geometry nodes to Python text-block.",
     "author": "Dave",
-    "version": (0, 2, 1),
+    "version": (0, 3, 0),
     "blender": (2, 80, 0),
     "location": "Material Shader Nodes / Geometry Shader Nodes",
     "category": "Developer",
