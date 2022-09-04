@@ -166,7 +166,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         if tree_node.bl_idname in ['ShaderNodeScript']:
             if tree_node.script != None:
                 m2p_text.write(line_prefix + "node.script = bpy.data.texts.get(\"%s\")\n" % tree_node.script.name)
-        # Input Vector Type
+        # Input Vector
         if tree_node.bl_idname in ['FunctionNodeInputVector']:
             vec_str = ""
             for def_val_index in range(len(tree_node.vector)):
@@ -174,6 +174,45 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                     vec_str = vec_str+", "
                 vec_str = vec_str+str(tree_node.vector[def_val_index])
             m2p_text.write(line_prefix + "node.vector = ("+vec_str+")\n")
+
+        # Color Ramp
+        if tree_node.bl_idname in ['ShaderNodeValToRGB'] and tree_node.color_ramp != None:
+            m2p_text.write(line_prefix + "node.color_ramp.color_mode = \"%s\"\n" % tree_node.color_ramp.color_mode)
+            m2p_text.write(line_prefix + "node.color_ramp.interpolation = \"%s\"\n"%tree_node.color_ramp.interpolation)
+            index = -1
+            for el in tree_node.color_ramp.elements:
+                index = index + 1
+                m2p_text.write(line_prefix + "elem = node.color_ramp.elements.new(%f)\n" % el.position)
+                m2p_text.write(line_prefix + "elem.color = (%f, %f, %f, %f)\n" %
+                               (index, el.color[0], el.color[1], el.color[2], el.color[3]))
+        # Float Curve, RGB Curve
+        if tree_node.bl_idname in ['ShaderNodeFloatCurve', 'ShaderNodeRGBCurve'] and tree_node.mapping != None:
+            m2p_text.write(line_prefix + "node.mapping.use_clip = %s\n" % tree_node.mapping.use_clip)
+            m2p_text.write(line_prefix + "node.mapping.clip_min_x = %f\n" % tree_node.mapping.clip_min_x)
+            m2p_text.write(line_prefix + "node.mapping.clip_min_y = %f\n" % tree_node.mapping.clip_min_y)
+            m2p_text.write(line_prefix + "node.mapping.clip_max_x = %f\n" % tree_node.mapping.clip_max_x)
+            m2p_text.write(line_prefix + "node.mapping.clip_max_y = %f\n" % tree_node.mapping.clip_max_y)
+            m2p_text.write(line_prefix + "node.mapping.extend = \"%s\"\n" % tree_node.mapping.extend)
+            # Float Curve has 1 curve
+            # RGB curve has 4 curves: C, R, G, B
+            curve_index = -1
+            for curve in tree_node.mapping.curves:
+                curve_index = curve_index + 1
+                point_index = -1
+                for p in curve.points:
+                    point_index = point_index + 1
+                    # each curve starts with 2 points by default, so write into these points before creating more
+                    if point_index < 2:
+                        m2p_text.write(line_prefix + "point = node.mapping.curves[%d].points[%d]\n" %
+                                       (curve_index, point_index))
+                        m2p_text.write(line_prefix + "point.location = (%f, %f)\n" % (p.location[0], p.location[1]))
+                    # create new point
+                    else:
+                        m2p_text.write(line_prefix + "point = node.mapping.curves[%d].points.new(%f, %f)\n" %
+                                       (curve_index, p.location[0], p.location[1]))
+                    m2p_text.write(line_prefix + "point.handle_type = \"%s\"\n" % p.handle_type)
+            # update the view of the mapping (trigger UI update)
+            m2p_text.write(line_prefix + "node.mapping.update()\n")
 
         write_filtered_attribs(m2p_text, line_prefix, tree_node)
 
