@@ -109,6 +109,9 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     for tree_node in the_tree_to_use.nodes:
         m2p_text.write(line_prefix + "node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
         for attr in uni_attr_default_list:
+            # Input Color node will write this value, so ignore it for now
+            if tree_node.bl_idname == 'FunctionNodeInputColor' and attr == 'color':
+                continue
             if hasattr(tree_node, attr):
                 gotten_attr = getattr(tree_node, attr)
                 # if write defaults is not enabled, and a default value is found, then skip the default value
@@ -151,7 +154,6 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
 
         # Geometry Nodes or Shader Nodes Group node
         if tree_node.bl_idname in ['GeometryNodeGroup', 'ShaderNodeGroup']:
-            # get name of node tree referenced by node
             m2p_text.write(line_prefix + "node.node_tree = bpy.data.node_groups.get(\""+tree_node.node_tree.name+
                            "\")\n")
         # Image Texture or Environment Texture node: get image if available
@@ -169,22 +171,30 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         # Input Vector
         if tree_node.bl_idname in ['FunctionNodeInputVector']:
             vec_str = ""
-            for def_val_index in range(len(tree_node.vector)):
+            for val_index in range(len(tree_node.vector)):
                 if vec_str != "":
                     vec_str = vec_str+", "
-                vec_str = vec_str+str(tree_node.vector[def_val_index])
+                vec_str = vec_str+str(tree_node.vector[val_index])
             m2p_text.write(line_prefix + "node.vector = ("+vec_str+")\n")
+        # Input Color
+        if tree_node.bl_idname == 'FunctionNodeInputColor':
+            color_str = ""
+            for val_index in range(len(tree_node.color)):
+                if color_str != "":
+                    color_str = color_str+", "
+                color_str = color_str+str(tree_node.color[val_index])
+            m2p_text.write(line_prefix + "node.color = ("+color_str+")\n")
 
         # Color Ramp
         if tree_node.bl_idname in ['ShaderNodeValToRGB'] and tree_node.color_ramp != None:
             m2p_text.write(line_prefix + "node.color_ramp.color_mode = \"%s\"\n" % tree_node.color_ramp.color_mode)
             m2p_text.write(line_prefix + "node.color_ramp.interpolation = \"%s\"\n"%tree_node.color_ramp.interpolation)
-            index = -1
+            elem_index = -1
             for el in tree_node.color_ramp.elements:
-                index = index + 1
+                elem_index = elem_index + 1
                 m2p_text.write(line_prefix + "elem = node.color_ramp.elements.new(%f)\n" % el.position)
                 m2p_text.write(line_prefix + "elem.color = (%f, %f, %f, %f)\n" %
-                               (index, el.color[0], el.color[1], el.color[2], el.color[3]))
+                               (el.color[0], el.color[1], el.color[2], el.color[3]))
         # Float Curve, RGB Curve
         if tree_node.bl_idname in ['ShaderNodeFloatCurve', 'ShaderNodeRGBCurve'] and tree_node.mapping != None:
             m2p_text.write(line_prefix + "node.mapping.use_clip = %s\n" % tree_node.mapping.use_clip)
@@ -234,21 +244,35 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                 continue
             # is default value a float/int/bool type?
             if isinstance(node_input.default_value, (float, int, bool)):
-                m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = " + \
+                m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = " +
                                str(node_input.default_value)+"\n")
             # is default value a string type?
             elif isinstance(node_input.default_value, str):
-                m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = \"" + \
+                m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = \"" +
                                esc_char_string(node_input.default_value)+"\"\n")
             # skip to next input if 'default_value' is not an array/list/tuple
             elif hasattr(node_input.default_value, '__len__'):
                 # default value is an tuple/array type
                 vec_str = ""
-                for def_val_index in range(len(node_input.default_value)):
+                for val_index in range(len(node_input.default_value)):
                     if vec_str != "":
                         vec_str = vec_str+", "
-                    vec_str = vec_str+str(node_input.default_value[def_val_index])
+                    vec_str = vec_str+str(node_input.default_value[val_index])
                 m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = ("+vec_str+")\n")
+            # default value might be from a basic types list built-in to Blender (Collection, Object, etc.)
+            elif hasattr(node_input.default_value, 'name'):
+                # is default value a Material type?
+                if isinstance(node_input.default_value, bpy.types.Material):
+                    m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = " +
+                                   "bpy.data.materials.get(\""+node_input.default_value.name+"\")\n")
+                # is default value a Object type?
+                elif isinstance(node_input.default_value, bpy.types.Object):
+                    m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = " +
+                                   "bpy.data.objects.get(\""+node_input.default_value.name+"\")\n")
+                # is default value a Collection type?
+                elif isinstance(node_input.default_value, bpy.types.Collection):
+                    m2p_text.write(line_prefix + "node.inputs["+str(input_count)+"].default_value = " +
+                                   "bpy.data.collections.get(\""+node_input.default_value.name+"\")\n")
         # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
         # TODO: this part needs more testing re: different node output default value(s) and type(s)
         output_count = -1
@@ -278,10 +302,10 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             elif hasattr(node_output.default_value, '__len__'):
                 # default value is an tuple/list/array type
                 vec_str = ""
-                for def_val_index in range(len(node_output.default_value)):
+                for val_index in range(len(node_output.default_value)):
                     if vec_str != "":
                         vec_str = vec_str+", "
-                    vec_str = vec_str+str(node_output.default_value[def_val_index])
+                    vec_str = vec_str+str(node_output.default_value[val_index])
                 m2p_text.write(line_prefix + "node.outputs["+str(output_count)+"].default_value = ("+vec_str+")\n")
 
         m2p_text.write(line_prefix + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
@@ -337,7 +361,6 @@ def get_output_num_for_link(tr_link):
     return None
 
 def write_filtered_attribs(m2p_text, line_prefix, node):
-    filtered_list = []
     for attr_name in dir(node):
         the_attr = getattr(node, attr_name)
         # filter out attributes that are built-ins (python/Blender), or callable functions, or
@@ -345,7 +368,6 @@ def write_filtered_attribs(m2p_text, line_prefix, node):
         if attr_name.startswith('__') or attr_name.startswith('bl_') or callable(the_attr) or \
             attr_name in FILTER_OUT_ATTRIBS:
             continue
-        filtered_list.append(attr_name)
         if isinstance(the_attr, str):
             m2p_text.write(line_prefix + "node."+attr_name+" = \"%s\"\n" % the_attr)
         elif isinstance(the_attr, bool):
@@ -354,6 +376,13 @@ def write_filtered_attribs(m2p_text, line_prefix, node):
             m2p_text.write(line_prefix + "node."+attr_name+" = %d\n" % the_attr)
         elif isinstance(the_attr, float):
             m2p_text.write(line_prefix + "node."+attr_name+" = %f\n" % the_attr)
+        elif hasattr(the_attr, 'name'):
+            if isinstance(the_attr, bpy.types.Material) != None:
+                m2p_text.write(line_prefix + "node."+attr_name+" = bpy.data.materials.get(\""+the_attr.name+"\")\n")
+            elif isinstance(the_attr, bpy.types.Object) != None:
+                m2p_text.write(line_prefix + "node."+attr_name+" = bpy.data.objects.get(\""+the_attr.name+"\")\n")
+            elif isinstance(the_attr, bpy.types.Collection) != None:
+                m2p_text.write(line_prefix + "node."+attr_name+" = bpy.data.collections.get(\""+the_attr.name+"\")\n")
 
 class M2P_CreateText(bpy.types.Operator):
     """Make Python text-block from current Material/Geometry node tree"""
