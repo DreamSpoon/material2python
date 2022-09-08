@@ -30,7 +30,7 @@ import bpy
 
 from .mat2py import M2P_CreateText
 
-if bpy.app.version < (2,80,0):
+if bpy.app.version < (2, 80, 0):
     Region = "TOOLS"
 else:
     Region = "UI"

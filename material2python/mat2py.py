@@ -46,6 +46,12 @@ FILTER_OUT_ATTRIBS = ['color', 'dimensions', 'height', 'hide', 'inputs', 'intern
 
 NODES_WITH_WRITE_OUTPUTS = ['ShaderNodeValue', 'ShaderNodeRGB', 'CompositorNodeValue', 'CompositorNodeRGB']
 
+def get_world_shader_name_from_tree(node_tree):
+    for w in bpy.data.worlds:
+        if w.node_tree == node_tree:
+            return w.name
+    return None
+
 # add escape characters to backslashes and double-quote chars in given string
 def esc_char_string(in_str):
     return in_str.replace('\\', '\\\\').replace('"', '\\"')
@@ -63,41 +69,41 @@ def get_output_num_for_link(tr_link):
     return None
 
 def bpy_value_to_string(value):
-        # write attribute, if it matches a known type
-        if isinstance(value, str):
-            return "\"%s\"" % value
-        elif isinstance(value, bool):
-            return "%s" % value
-        elif isinstance(value, int):
-            return "%d" % value
-        elif isinstance(value, float):
-            return "%f" % value
-        # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple
-        elif hasattr(value, '__len__'):
-            vec_str = ""
-            for val_index in range(len(value)):
-                if vec_str != "":
-                    vec_str = vec_str+", "
-                vec_str = vec_str+str(value[val_index])
-            return "("+vec_str+")"
-        # if the attribute's value has attribute 'name', then check if it is in a Blender built-in data list
-        elif hasattr(value, 'name'):
-            if type(value) == bpy.types.Image:
-                return "bpy.data.images.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.Mask:
-                return "bpy.data.masks.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.Scene:
-                return "bpy.data.scenes.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.Material:
-                return "bpy.data.materials.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.Object:
-                return "bpy.data.objects.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.Collection:
-                return "bpy.data.collections.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.GeometryNodeTree or type(value) == bpy.types.ShaderNodeTree:
-                return "bpy.data.node_groups.get(\""+value.name+"\")"
-            elif type(value) == bpy.types.Text:
-                return "bpy.data.texts.get(\""+value.name+"\")"
+    # write attribute, if it matches a known type
+    if isinstance(value, str):
+        return "\"%s\"" % value
+    elif isinstance(value, bool):
+        return "%s" % value
+    elif isinstance(value, int):
+        return "%d" % value
+    elif isinstance(value, float):
+        return "%f" % value
+    # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple
+    elif hasattr(value, '__len__'):
+        vec_str = ""
+        for val_index in range(len(value)):
+            if vec_str != "":
+                vec_str = vec_str + ", "
+            vec_str = vec_str + str(value[val_index])
+        return "(" + vec_str + ")"
+    # if the attribute's value has attribute 'name', then check if it is in a Blender built-in data list
+    elif hasattr(value, 'name'):
+        if type(value) == bpy.types.Image:
+            return "bpy.data.images.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.Mask:
+            return "bpy.data.masks.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.Scene:
+            return "bpy.data.scenes.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.Material:
+            return "bpy.data.materials.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.Object:
+            return "bpy.data.objects.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.Collection:
+            return "bpy.data.collections.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.GeometryNodeTree or type(value) == bpy.types.ShaderNodeTree:
+            return "bpy.data.node_groups.get(\"" + value.name + "\")"
+        elif type(value) == bpy.types.Text:
+            return "bpy.data.texts.get(\"" + value.name + "\")"
 
 def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
     # loop through all attributes of 'node' object
@@ -115,33 +121,34 @@ def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
 
         # if type is Color Ramp
         if type(the_attr) == bpy.types.ColorRamp:
-            m2p_text.write(line_prefix + "node."+attr_name+".color_mode = \"%s\"\n" % the_attr.color_mode)
-            m2p_text.write(line_prefix + "node."+attr_name+".interpolation = \"%s\"\n" % the_attr.interpolation)
+            m2p_text.write(line_prefix + "node." + attr_name + ".color_mode = \"%s\"\n" % the_attr.color_mode)
+            m2p_text.write(line_prefix + "node." + attr_name + ".interpolation = \"%s\"\n" % the_attr.interpolation)
             # remove one element before adding any new elements, leaving the minimum of one element in list
             # (deleting last element causes Blender error, but one elements needs to be deleted in case only 1 is used)
-            m2p_text.write(line_prefix + "node."+attr_name+".elements.remove("+"node."+attr_name+".elements[0])\n")
+            m2p_text.write(line_prefix + "node." + attr_name + ".elements.remove(" + "node." + attr_name +
+                           ".elements[0])\n")
             # add new elements, as needed
             elem_index = -1
             for el in the_attr.elements:
                 elem_index = elem_index + 1
                 # if writing first element then don't create new element
                 if elem_index < 1:
-                    m2p_text.write(line_prefix + "elem = node."+attr_name+".elements[0]\n")
+                    m2p_text.write(line_prefix + "elem = node." + attr_name + ".elements[0]\n")
                     m2p_text.write(line_prefix + "elem.position = %f\n" % el.position)
                 # else create new element
                 else:
-                    m2p_text.write(line_prefix + "elem = node."+attr_name+".elements.new(%f)\n" % el.position)
+                    m2p_text.write(line_prefix + "elem = node." + attr_name + ".elements.new(%f)\n" % el.position)
 
                 m2p_text.write(line_prefix + "elem.color = (%f, %f, %f, %f)\n" %
                                (el.color[0], el.color[1], el.color[2], el.color[3]))
         # if type is Curve Mapping, e.g. nodes Float Curve (Shader), RGB Curve (Shader), Time Curve (Compositor)
         elif type(the_attr) == bpy.types.CurveMapping:
-            m2p_text.write(line_prefix + "node."+attr_name+".use_clip = %s\n" % the_attr.use_clip)
-            m2p_text.write(line_prefix + "node."+attr_name+".clip_min_x = %f\n" % the_attr.clip_min_x)
-            m2p_text.write(line_prefix + "node."+attr_name+".clip_min_y = %f\n" % the_attr.clip_min_y)
-            m2p_text.write(line_prefix + "node."+attr_name+".clip_max_x = %f\n" % the_attr.clip_max_x)
-            m2p_text.write(line_prefix + "node."+attr_name+".clip_max_y = %f\n" % the_attr.clip_max_y)
-            m2p_text.write(line_prefix + "node."+attr_name+".extend = \"%s\"\n" % the_attr.extend)
+            m2p_text.write(line_prefix + "node." + attr_name + ".use_clip = %s\n" % the_attr.use_clip)
+            m2p_text.write(line_prefix + "node." + attr_name + ".clip_min_x = %f\n" % the_attr.clip_min_x)
+            m2p_text.write(line_prefix + "node." + attr_name + ".clip_min_y = %f\n" % the_attr.clip_min_y)
+            m2p_text.write(line_prefix + "node." + attr_name + ".clip_max_x = %f\n" % the_attr.clip_max_x)
+            m2p_text.write(line_prefix + "node." + attr_name + ".clip_max_y = %f\n" % the_attr.clip_max_y)
+            m2p_text.write(line_prefix + "node." + attr_name + ".extend = \"%s\"\n" % the_attr.extend)
             # note: Float Curve and Time Curve have 1 curve, RGB curve has 4 curves (C, R, G, B)
             curve_index = -1
             for curve in the_attr.curves:
@@ -154,20 +161,24 @@ def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
                     # each curve starts with 2 points by default, so write into these points before creating more
                     # (2 points minimum, cannot delete them)
                     if point_index < 2:
-                        m2p_text.write(line_prefix + "point = node."+attr_name+".curves[%d].points[%d]\n" %
+                        m2p_text.write(line_prefix + "point = node." + attr_name + ".curves[%d].points[%d]\n" %
                                        (curve_index, point_index))
                         m2p_text.write(line_prefix + "point.location = (%f, %f)\n" % (p.location[0], p.location[1]))
                     # create new point
                     else:
-                        m2p_text.write(line_prefix + "point = node."+attr_name+".curves[%d].points.new(%f, %f)\n" %
+                        m2p_text.write(line_prefix + "point = node." + attr_name + ".curves[%d].points.new(%f, %f)\n" %
                                        (curve_index, p.location[0], p.location[1]))
                     m2p_text.write(line_prefix + "point.handle_type = \"%s\"\n" % p.handle_type)
 
             # update the view of the mapping (trigger UI update)
-            m2p_text.write(line_prefix + "node."+attr_name+".update()\n")
+            m2p_text.write(line_prefix + "node." + attr_name + ".update()\n")
         # remaining types are String, Integer, Float, etc. (including bpy.types, e.g. bpy.types.Collection)
         else:
-            m2p_text.write(line_prefix + "node."+attr_name+" = "+bpy_value_to_string(the_attr)+"\n")
+            val_str = bpy_value_to_string(the_attr)
+            # do not write attributes that have value None
+            # e.g. an 'object' attribute, that is set to None to indicate no object
+            if val_str != None:
+                m2p_text.write(line_prefix + "node." + attr_name + " = " + val_str + "\n")
 
 def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, use_edit_tree,
                      uni_node_options):
@@ -178,7 +189,6 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         line_prefix = space_pad
 
     mat = context.space_data
-
     m2p_text = bpy.data.texts.new(M2P_TEXT_NAME)
 
     the_tree_to_use = mat.node_tree
@@ -192,7 +202,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     if make_into_function:
         # if using Node Group (Shader or Geometry Nodes)
         if is_tree_node_group:
-            m2p_text.write("Node Group named \""+the_tree_to_use.name+"\"\n\nimport bpy\n\n# add nodes and " +
+            m2p_text.write("Node Group named \"" + the_tree_to_use.name + "\"\n\nimport bpy\n\n# add nodes and " +
                            "links to node group \ndef add_group_nodes(node_group_name):\n")
         # if using Compositor node tree
         elif the_tree_to_use.bl_idname == 'CompositorNodeTree':
@@ -200,21 +210,21 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                            "compositor node tree\ndef add_material_nodes(material):\n")
         # using Material node tree
         else:
-            m2p_text.write("material named \""+the_tree_to_use.name+"\"\n\nimport bpy\n\n# add nodes and links to " +
-                           "material\ndef add_material_nodes(material):\n")
+            m2p_text.write("material named \"" + the_tree_to_use.name + "\"\n\nimport bpy\n\n# add nodes and links " +
+                           "to material\ndef add_material_nodes(material):\n")
 
     if is_tree_node_group:
         m2p_text.write(line_prefix + "# initialize variables\n")
         m2p_text.write(line_prefix + "new_nodes = {}\n")
-        m2p_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='"+
-                       the_tree_to_use.bl_idname+"')\n")
+        m2p_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='" +
+                       the_tree_to_use.bl_idname + "')\n")
         # get the node group inputs and outputs
         for ng_input in node_group.inputs:
-            m2p_text.write(line_prefix + "new_node_group.inputs.new(type='"+ng_input.bl_socket_idname+"', name=\"" +
-                           ng_input.name+"\")\n")
+            m2p_text.write(line_prefix + "new_node_group.inputs.new(type='" + ng_input.bl_socket_idname + "', name=\""+
+                           ng_input.name + "\")\n")
         for ng_output in node_group.outputs:
-            m2p_text.write(line_prefix + "new_node_group.outputs.new(type='"+ng_output.bl_socket_idname+"', name=\"" +
-                           ng_output.name+"\")\n")
+            m2p_text.write(line_prefix + "new_node_group.outputs.new(type='" + ng_output.bl_socket_idname +
+                           "', name=\"" + ng_output.name + "\")\n")
 
         m2p_text.write(line_prefix + "tree_nodes = new_node_group.nodes\n")
     else:
@@ -251,7 +261,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                         uni_node_options[WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT] == False:
                     continue
 
-                m2p_text.write(line_prefix+"node."+attr+" = "+bpy_value_to_string(gotten_attr)+"\n")
+                m2p_text.write(line_prefix + "node." + attr + " = " + bpy_value_to_string(gotten_attr) + "\n")
 
         # node with parent is special, this node is offset by their parent frame's location
         parent_loc = Vector((0, 0))
@@ -260,14 +270,14 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
 
         # do rounding of location values, if needed, and write the values
         precision = uni_node_options[LOC_DEC_PLACES_UNI_NODE_OPT]
-        loc_x = tree_node.location.x+parent_loc.x
-        loc_y = tree_node.location.y+parent_loc.y
+        loc_x = tree_node.location.x + parent_loc.x
+        loc_y = tree_node.location.y + parent_loc.y
         m2p_text.write(line_prefix + "node.location = (%0.*f, %0.*f)\n" % (precision, loc_x, precision, loc_y))
 
         # Input Color, this attribute is special because this node type's Color attribute is swapped - very strange!
         # (maybe a dinosaur left over from old versions of Blender)
         if tree_node.bl_idname == 'FunctionNodeInputColor':
-            m2p_text.write(line_prefix + "node.color = "+bpy_value_to_string(tree_node.color)+"\n")
+            m2p_text.write(line_prefix + "node.color = " + bpy_value_to_string(tree_node.color) + "\n")
             ignore_attribs.append("color")
 
         write_filtered_attribs(m2p_text, line_prefix, tree_node, ignore_attribs)
@@ -289,8 +299,8 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False and node_input.is_linked:
                 continue
 
-            m2p_text.write(line_prefix+"node.inputs["+str(input_count)+"].default_value = ("+
-                           bpy_value_to_string(node_input.default_value)+")\n")
+            m2p_text.write(line_prefix + "node.inputs[" + str(input_count) + "].default_value = (" +
+                           bpy_value_to_string(node_input.default_value) + ")\n")
 
         # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
         # TODO: this part needs more testing re: different node output default value(s) and type(s)
@@ -310,8 +320,8 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False and node_output.is_linked:
                 continue
 
-            m2p_text.write(line_prefix + "node.outputs["+str(output_count)+"].default_value = ("+
-                           bpy_value_to_string(node_output.default_value)+")\n")
+            m2p_text.write(line_prefix + "node.outputs[" + str(output_count) + "].default_value = (" +
+                           bpy_value_to_string(node_output.default_value) + ")\n")
 
         m2p_text.write(line_prefix + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
         # save a reference to parent node for later, if parent node exists
@@ -339,16 +349,22 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             tree_link.to_socket.node.name + "\"].inputs[" + str(get_input_num_for_link(tree_link)) + "])\n")
         if keep_links:
             m2p_text.write(line_prefix + "new_links.append(link)\n")
-
     if make_into_function:
+        world_shader_name = get_world_shader_name_from_tree(the_tree_to_use)
         # if using nodes in a group (Shader or Geometry Nodes)
         if is_tree_node_group:
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to new Node Group\n" +
-                           "add_group_nodes('"+the_tree_to_use.name+"')\n")
+                           "add_group_nodes('" + the_tree_to_use.name + "')\n")
         # if using Compositor node tree
         elif the_tree_to_use.bl_idname == 'CompositorNodeTree':
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to compositor node tree\n" +
                            "add_material_nodes(bpy.context.scene)\n")
+        # if using World shader node tree
+        elif world_shader_name != None:
+            m2p_text.write("\n# use Python script to add nodes, and links between nodes, to the World shader\n" +
+                           "world_shader = bpy.data.worlds.new(\""+world_shader_name+"\")\n" +
+                           "world_shader.use_nodes = True\n" +
+                           "add_material_nodes(world_shader)\n")
         # else using Material Shader Nodes
         else:
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to the active material " +
@@ -369,7 +385,7 @@ class M2P_CreateText(bpy.types.Operator):
     def poll(cls, context):
         s = context.space_data
         if s.type == 'NODE_EDITOR' and s.node_tree != None and \
-            s.tree_type in ("CompositorNodeTree", "ShaderNodeTree", "TextureNodeTree", "GeometryNodeTree"):
+            s.tree_type in ('CompositorNodeTree', 'ShaderNodeTree', 'TextureNodeTree', 'GeometryNodeTree'):
             return True
         return False
 
