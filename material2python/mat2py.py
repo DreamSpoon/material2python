@@ -27,7 +27,7 @@ uni_attr_default_list = {
     "width": 0.0,
     "width_hidden": 42.0,
     "height": 100.0,
-    "color": Color((0.608000, 0.608000, 0.608000)),
+    "color": Color((0.608, 0.608, 0.608)),
     "use_custom_color": False,
     "mute": False,
     "hide": False,
@@ -104,6 +104,9 @@ def bpy_value_to_string(value):
             return "bpy.data.node_groups.get(\"" + value.name + "\")"
         elif type(value) == bpy.types.Text:
             return "bpy.data.texts.get(\"" + value.name + "\")"
+    # return None, because attribute type is unknown
+    else:
+        return None
 
 def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
     # loop through all attributes of 'node' object
@@ -180,6 +183,18 @@ def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
             if val_str != None:
                 m2p_text.write(line_prefix + "node." + attr_name + " = " + val_str + "\n")
 
+def get_node_io_value_str(node_io_element, write_linked):
+    # ignore virtual sockets and shader sockets, no default
+    if node_io_element.bl_idname == 'NodeSocketVirtual' or node_io_element.bl_idname == 'NodeSocketShader':
+        return None
+    # if node doesn't have attribute 'default_value', then cannot save the value - so continue
+    if not hasattr(node_io_element, 'default_value'):
+        return None
+    # if 'do not write linked default values', and this input socket is linked then skip
+    if not write_linked and node_io_element.is_linked:
+        return None
+    return bpy_value_to_string(node_io_element.default_value)
+
 def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, use_edit_tree,
                      uni_node_options):
     line_prefix = ""
@@ -206,12 +221,12 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                            "links to node group \ndef add_group_nodes(node_group_name):\n")
         # if using Compositor node tree
         elif the_tree_to_use.bl_idname == 'CompositorNodeTree':
-            m2p_text.write("compositor node tree\n\nimport bpy\n\n# add nodes and links to " +
+            m2p_text.write("Compositor node tree\n\nimport bpy\n\n# add nodes and links to " +
                            "compositor node tree\ndef add_material_nodes(material):\n")
         # using Material node tree
         else:
-            m2p_text.write("material named \"" + the_tree_to_use.name + "\"\n\nimport bpy\n\n# add nodes and links " +
-                           "to material\ndef add_material_nodes(material):\n")
+            m2p_text.write("Material node tree named \"" + the_tree_to_use.name + "\"\n\nimport bpy\n\n# add nodes " +
+                           "and links to material\ndef add_material_nodes(material):\n")
 
     if is_tree_node_group:
         m2p_text.write(line_prefix + "# initialize variables\n")
@@ -289,18 +304,9 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             input_count = input_count + 1
             if node_input.hide_value:
                 continue
-            # ignore virtual sockets and shader sockets, no default
-            if node_input.bl_idname == 'NodeSocketVirtual' or node_input.bl_idname == 'NodeSocketShader':
-                continue
-            # if node doesn't have attribute 'default_value', then cannot save the value - so continue
-            if not hasattr(node_input, 'default_value'):
-                continue
-            # if 'do not write linked default values', and this input socket is linked then skip
-            if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False and node_input.is_linked:
-                continue
-
-            m2p_text.write(line_prefix + "node.inputs[" + str(input_count) + "].default_value = (" +
-                           bpy_value_to_string(node_input.default_value) + ")\n")
+            value_str = get_node_io_value_str(node_input, uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT])
+            if value_str != None:
+                m2p_text.write(line_prefix+"node.inputs["+str(input_count)+"].default_value = "+value_str+"\n")
 
         # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
         # TODO: this part needs more testing re: different node output default value(s) and type(s)
@@ -309,19 +315,10 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             output_count = output_count + 1
             if tree_node.bl_idname not in NODES_WITH_WRITE_OUTPUTS:
                 continue
-            # ignore virtual sockets and shader sockets, no default
-            if node_output.bl_idname == 'NodeSocketVirtual' or node_output.bl_idname == 'NodeSocketShader':
-                continue
-            # if node doesn't have attribute 'default_value', then cannot save the value - so continue
-            if not hasattr(node_output, 'default_value'):
-                continue
-            # if 'do not write linked default values', and this output socket is used (i.e. 'linked'),
-            # and it is not a Input Value node, then skip
-            if uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT] == False and node_output.is_linked:
-                continue
-
-            m2p_text.write(line_prefix + "node.outputs[" + str(output_count) + "].default_value = (" +
-                           bpy_value_to_string(node_output.default_value) + ")\n")
+            # always write the value, even if linked, because this node is special
+            value_str = get_node_io_value_str(node_output, True)
+            if value_str != None:
+                m2p_text.write(line_prefix+"node.outputs["+str(output_count)+"].default_value = "+value_str+"\n")
 
         m2p_text.write(line_prefix + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
         # save a reference to parent node for later, if parent node exists
