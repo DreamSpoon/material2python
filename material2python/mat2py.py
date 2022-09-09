@@ -346,6 +346,11 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             tree_link.to_socket.node.name + "\"].inputs[" + str(get_input_num_for_link(tree_link)) + "])\n")
         if keep_links:
             m2p_text.write(line_prefix + "new_links.append(link)\n")
+
+    m2p_text.write("\n" + line_prefix + "# deselect all new nodes\n" +
+                   line_prefix + "for n in new_nodes.values(): n.select = False\n" +
+                   line_prefix + "return new_node_group\n")
+
     if make_into_function:
         world_shader_name = get_world_shader_name_from_tree(the_tree_to_use)
         # if using nodes in a group (Shader or Geometry Nodes)
