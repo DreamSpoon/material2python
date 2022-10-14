@@ -78,14 +78,29 @@ def bpy_value_to_string(value):
         return "%d" % value
     elif isinstance(value, float):
         return "%f" % value
-    # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple
+    # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple,
+    # unless it is a set
     elif hasattr(value, '__len__'):
         vec_str = ""
-        for val_index in range(len(value)):
-            if vec_str != "":
-                vec_str = vec_str + ", "
-            vec_str = vec_str + str(value[val_index])
-        return "(" + vec_str + ")"
+        # is it a set?
+        if isinstance(value, set):
+            for item in value:
+                if vec_str != "":
+                    vec_str = vec_str + ", "
+                if isinstance(item, str):
+                    vec_str = vec_str + "\"" + str(item) + "\""
+                else:
+                    vec_str = vec_str + str(item)
+            return "{" + vec_str + "}"
+        else:
+            for val_index in range(len(value)):
+                if vec_str != "":
+                    vec_str = vec_str + ", "
+                if isinstance(value[val_index], str):
+                    vec_str = vec_str + "\"" + str(value[val_index]) + "\""
+                else:
+                    vec_str = vec_str + str(value[val_index])
+            return "(" + vec_str + ")"
     # if the attribute's value has attribute 'name', then check if it is in a Blender built-in data list
     elif hasattr(value, 'name'):
         if type(value) == bpy.types.Image:
@@ -348,8 +363,12 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             m2p_text.write(line_prefix + "new_links.append(link)\n")
 
     m2p_text.write("\n" + line_prefix + "# deselect all new nodes\n" +
-                   line_prefix + "for n in new_nodes.values(): n.select = False\n" +
-                   line_prefix + "return new_node_group\n")
+                   line_prefix + "for n in new_nodes.values(): n.select = False\n")
+
+    if is_tree_node_group:
+        m2p_text.write("\n" + line_prefix + "return new_node_group\n")
+    else:
+        m2p_text.write("\n" + line_prefix + "return new_nodes\n")
 
     if make_into_function:
         world_shader_name = get_world_shader_name_from_tree(the_tree_to_use)
