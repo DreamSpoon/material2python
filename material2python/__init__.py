@@ -53,7 +53,6 @@ class M2P_PT_MaterialToPython(bpy.types.Panel):
         box.prop(scn, "M2P_KeepLinks")
         box.prop(scn, "M2P_MakeFunction")
         box.prop(scn, "M2P_DeleteExisting")
-        box.prop(scn, "M2P_UseEditTree")
         box = layout.box()
         box.label(text="Write Attributes")
         box.prop(scn, "M2P_WriteAttribName")
@@ -79,10 +78,6 @@ def register():
     bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader",
         description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup " +
         "before creating new nodes", default=True)
-    bts.M2P_UseEditTree = bp.BoolProperty(name="Use Edit Tree",
-        description="Use node tree currently displayed (edit_tree) in the Shader node editor. To capture custom " +
-            "Node Group, enable this option and use 'Material to Python' button while viewing the custom Node Group",
-        default=True)
     bts.M2P_WriteDefaultValues = bp.BoolProperty(name="Write Defaults", description="Include attributes of nodes " +
         "that have default values", default=False)
     bts.M2P_WriteLocDecimalPlaces = bp.IntProperty(name="Location Decimal Places", description="Number of " +
@@ -103,7 +98,6 @@ def unregister():
     del bts.M2P_WriteLinkedDefaultValues
     del bts.M2P_WriteLocDecimalPlaces
     del bts.M2P_WriteDefaultValues
-    del bts.M2P_UseEditTree
     del bts.M2P_DeleteExisting
     del bts.M2P_MakeFunction
     del bts.M2P_KeepLinks

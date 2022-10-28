@@ -188,6 +188,8 @@ def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
                                        (curve_index, p.location[0], p.location[1]))
                     m2p_text.write(line_prefix + "point.handle_type = \"%s\"\n" % p.handle_type)
 
+            # reset the clipping view
+            m2p_text.write(line_prefix + "node." + attr_name + ".reset_view()\n")
             # update the view of the mapping (trigger UI update)
             m2p_text.write(line_prefix + "node." + attr_name + ".update()\n")
         # remaining types are String, Integer, Float, etc. (including bpy.types, e.g. bpy.types.Collection)
@@ -210,8 +212,7 @@ def get_node_io_value_str(node_io_element, write_linked):
         return None
     return bpy_value_to_string(node_io_element.default_value)
 
-def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, use_edit_tree,
-                     uni_node_options):
+def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, uni_node_options):
     line_prefix = ""
     if isinstance(space_pad, int):
         line_prefix = " " * space_pad
@@ -221,33 +222,29 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     mat = context.space_data
     m2p_text = bpy.data.texts.new(M2P_TEXT_NAME)
 
-    the_tree_to_use = mat.node_tree
-    if use_edit_tree:
-        the_tree_to_use = mat.edit_tree
-
-    node_group = bpy.data.node_groups.get(the_tree_to_use.name)
+    node_group = bpy.data.node_groups.get(mat.edit_tree.name)
     is_tree_node_group = (node_group != None)
 
     m2p_text.write("# Blender Python script to re-create ")
     if make_into_function:
         # if using Node Group (Shader or Geometry Nodes)
         if is_tree_node_group:
-            m2p_text.write("Node Group named \"" + the_tree_to_use.name + "\"\n\nimport bpy\n\n# add nodes and " +
+            m2p_text.write("Node Group named \"" + mat.edit_tree.name + "\"\n\nimport bpy\n\n# add nodes and " +
                            "links to node group \ndef add_group_nodes(node_group_name):\n")
         # if using Compositor node tree
-        elif the_tree_to_use.bl_idname == 'CompositorNodeTree':
+        elif mat.edit_tree.bl_idname == 'CompositorNodeTree':
             m2p_text.write("Compositor node tree\n\nimport bpy\n\n# add nodes and links to " +
                            "compositor node tree\ndef add_material_nodes(material):\n")
         # using Material node tree
         else:
-            m2p_text.write("Material node tree named \"" + the_tree_to_use.name + "\"\n\nimport bpy\n\n# add nodes " +
+            m2p_text.write("Material node tree named \"" + mat.edit_tree.name + "\"\n\nimport bpy\n\n# add nodes " +
                            "and links to material\ndef add_material_nodes(material):\n")
 
     if is_tree_node_group:
         m2p_text.write(line_prefix + "# initialize variables\n")
         m2p_text.write(line_prefix + "new_nodes = {}\n")
         m2p_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='" +
-                       the_tree_to_use.bl_idname + "')\n")
+                       mat.edit_tree.bl_idname + "')\n")
         # get the node group inputs and outputs
         for ng_input in node_group.inputs:
             m2p_text.write(line_prefix + "new_node_group.inputs.new(type='" + ng_input.bl_socket_idname + "', name=\""+
@@ -271,7 +268,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     # so that parent nodes are referenced only after parent nodes are created
     frame_parenting_text = ""
     # write info about the individual nodes
-    for tree_node in the_tree_to_use.nodes:
+    for tree_node in mat.edit_tree.nodes:
         m2p_text.write(line_prefix + "node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
         ignore_attribs = []
         for attr in uni_attr_default_list:
@@ -352,7 +349,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         m2p_text.write(line_prefix + "tree_links = new_node_group.links\n")
     else:
         m2p_text.write(line_prefix + "tree_links = material.node_tree.links\n")
-    for tree_link in the_tree_to_use.links:
+    for tree_link in mat.edit_tree.links:
         flint = ""
         if keep_links:
             flint = "link = "
@@ -371,13 +368,13 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         m2p_text.write("\n" + line_prefix + "return new_nodes\n")
 
     if make_into_function:
-        world_shader_name = get_world_shader_name_from_tree(the_tree_to_use)
+        world_shader_name = get_world_shader_name_from_tree(mat.edit_tree)
         # if using nodes in a group (Shader or Geometry Nodes)
         if is_tree_node_group:
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to new Node Group\n" +
-                           "add_group_nodes('" + the_tree_to_use.name + "')\n")
+                           "add_group_nodes('" + mat.edit_tree.name + "')\n")
         # if using Compositor node tree
-        elif the_tree_to_use.bl_idname == 'CompositorNodeTree':
+        elif mat.edit_tree.bl_idname == 'CompositorNodeTree':
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to compositor node tree\n" +
                            "add_material_nodes(bpy.context.scene)\n")
         # if using World shader node tree
@@ -420,5 +417,5 @@ class M2P_CreateText(bpy.types.Operator):
             WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: scn.M2P_WriteAttribWidthAndHeight,
         }
         create_code_text(context, scn.M2P_NumSpacePad, scn.M2P_KeepLinks, scn.M2P_MakeFunction, scn.M2P_DeleteExisting,
-            scn.M2P_UseEditTree, uni_node_options)
+                         uni_node_options)
         return {'FINISHED'}
