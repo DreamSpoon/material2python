@@ -20,7 +20,7 @@ bl_info = {
     "name": "Material 2 Python",
     "description": "Convert material/geometry nodes to Python text-block.",
     "author": "Dave",
-    "version": (0, 3, 0),
+    "version": (0, 4, 0),
     "blender": (2, 80, 0),
     "location": "Material Shader Nodes / Geometry Shader Nodes",
     "category": "Developer",
@@ -56,10 +56,12 @@ class M2P_PT_MaterialToPython(bpy.types.Panel):
         box = layout.box()
         box.label(text="Write Attributes")
         box.prop(scn, "M2P_WriteAttribName")
-        box.prop(scn, "M2P_WriteAttribWidthAndHeight")
-        box.prop(scn, "M2P_WriteLocDecimalPlaces")
+        box.prop(scn, "M2P_WriteAttribSelect")
+        sub_box = box.box()
+        sub_box.prop(scn, "M2P_WriteAttribWidthAndHeight")
+        sub_box.prop(scn, "M2P_WriteLocDecimalPlaces")
         box = layout.box()
-        box.label(text="Write Defaults")
+        box.label(text="Write Default Values")
         box.prop(scn, "M2P_WriteDefaultValues")
         box.prop(scn, "M2P_WriteLinkedDefaultValues")
 
@@ -78,21 +80,24 @@ def register():
     bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader",
         description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup " +
         "before creating new nodes", default=True)
-    bts.M2P_WriteDefaultValues = bp.BoolProperty(name="Write Defaults", description="Include attributes of nodes " +
-        "that have default values", default=False)
     bts.M2P_WriteLocDecimalPlaces = bp.IntProperty(name="Location Decimal Places", description="Number of " +
         "decimal places to use when writing location values", default=0)
-
-    bts.M2P_WriteLinkedDefaultValues = bp.BoolProperty(name="Linked Default Values", description="Desc", default=False)
+    bts.M2P_WriteDefaultValues = bp.BoolProperty(name="Write Defaults", description="Write node attributes " +
+        "that are set to default values (e.g. node attributes: label, name)", default=False)
+    bts.M2P_WriteLinkedDefaultValues = bp.BoolProperty(name="Linked Default Values", description="Write default " +
+        "values, of node inputs and outputs, where the input/output is linked to another node", default=False)
     bts.M2P_WriteAttribName = bp.BoolProperty(name="Name", description="Include node attribute 'name'", default=False)
     bts.M2P_WriteAttribWidthAndHeight = bp.BoolProperty(name="Width and Height", description="Include node " +
         "attributes for width and height", default=False)
+    bts.M2P_WriteAttribSelect = bp.BoolProperty(name="Select", description="Include node " +
+        "attribute for select state (e.g. selected nodes can be 'marked' for easy search later)", default=False)
 
 def unregister():
     bpy.utils.unregister_class(M2P_CreateText)
     bpy.utils.unregister_class(M2P_PT_MaterialToPython)
 
     bts = bpy.types.Scene
+    del bts.M2P_WriteAttribSelect
     del bts.M2P_WriteAttribWidthAndHeight
     del bts.M2P_WriteAttribName
     del bts.M2P_WriteLinkedDefaultValues

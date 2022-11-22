@@ -31,6 +31,7 @@ uni_attr_default_list = {
     "use_custom_color": False,
     "mute": False,
     "hide": False,
+    "select": None,
 }
 
 WRITE_DEFAULTS_UNI_NODE_OPT = "write_defaults"
@@ -38,6 +39,7 @@ WRITE_LINKED_DEFAULTS_UNI_NODE_OPT = "write_linked_defaults"
 LOC_DEC_PLACES_UNI_NODE_OPT = "loc_decimal_places"
 WRITE_ATTR_NAME_UNI_NODE_OPT = "write_attr_name"
 WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT = "write_attr_width_height"
+WRITE_ATTR_SELECT_UNI_NODE_OPT = "write_attr_select"
 
 FILTER_OUT_ATTRIBS = ['color', 'dimensions', 'height', 'hide', 'inputs', 'internal_links', 'label', 'location',
                          'mute', 'name', 'outputs', 'parent', 'rna_type', 'select', 'show_options', 'show_preview',
@@ -287,6 +289,9 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                 elif (attr == 'width' or attr == 'height') and \
                         uni_node_options[WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT] == False:
                     continue
+                # if not writing select state then skip
+                elif attr == 'select' and uni_node_options[WRITE_ATTR_SELECT_UNI_NODE_OPT] == False:
+                    continue
 
                 m2p_text.write(line_prefix + "node." + attr + " = " + bpy_value_to_string(gotten_attr) + "\n")
 
@@ -415,6 +420,7 @@ class M2P_CreateText(bpy.types.Operator):
             WRITE_LINKED_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteLinkedDefaultValues,
             WRITE_ATTR_NAME_UNI_NODE_OPT: scn.M2P_WriteAttribName,
             WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: scn.M2P_WriteAttribWidthAndHeight,
+            WRITE_ATTR_SELECT_UNI_NODE_OPT: scn.M2P_WriteAttribSelect,
         }
         create_code_text(context, scn.M2P_NumSpacePad, scn.M2P_KeepLinks, scn.M2P_MakeFunction, scn.M2P_DeleteExisting,
                          uni_node_options)
