@@ -125,6 +125,26 @@ def bpy_value_to_string(value):
     else:
         return None
 
+def bpy_compare_to_value(blender_value, va):
+    if hasattr(blender_value, '__len__') and hasattr(va, '__len__'):
+        # False if lengths of objects are different
+        if len(blender_value) != len(va):
+            return False
+        # is it a set?
+        if isinstance(blender_value, set):
+            c = 0
+            for item in blender_value:
+                if item != va[c]:
+                    return False
+                c = c + 1
+        else:
+            for val_index in range(len(blender_value)):
+                if blender_value[val_index] != va[val_index]:
+                    return False
+        return True
+    else:
+        return blender_value == va
+
 def write_filtered_attribs(m2p_text, line_prefix, node, ignore_attribs):
     # loop through all attributes of 'node' object
     for attr_name in dir(node):
@@ -247,13 +267,40 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         m2p_text.write(line_prefix + "new_nodes = {}\n")
         m2p_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='" +
                        mat.edit_tree.bl_idname + "')\n")
-        # get the node group inputs and outputs
+        # write group inputs
         for ng_input in node_group.inputs:
-            m2p_text.write(line_prefix + "new_node_group.inputs.new(type='" + ng_input.bl_socket_idname + "', name=\""+
-                           ng_input.name + "\")\n")
+            m2p_text.write(line_prefix + "new_input = new_node_group.inputs.new(type='" + ng_input.bl_socket_idname +
+                           "', name=\"" + ng_input.name + "\")\n")
+            # write the min, max, default, and 'hide value' data
+            if hasattr(ng_input, "min_value") and ng_input.min_value != -340282346638528859811704183484516925440.0:
+                m2p_text.write(line_prefix + "new_input.min_value = " + bpy_value_to_string(ng_input.min_value) + "\n")
+            if hasattr(ng_input, "max_value") and ng_input.max_value != 340282346638528859811704183484516925440.0:
+                m2p_text.write(line_prefix + "new_input.max_value = " + bpy_value_to_string(ng_input.max_value) + "\n")
+            if ng_input.default_value != 0.0 and \
+                    not bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0)) and \
+                    not ( ng_input.bl_socket_idname == 'NodeSocketColor' and \
+                          bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0, 1.0)) ):
+                m2p_text.write(line_prefix + "new_input.default_value = "+bpy_value_to_string(ng_input.default_value)+
+                               "\n")
+            if ng_input.hide_value:
+                m2p_text.write(line_prefix + "new_input.hide_value = True\n")
+        # write group outputs
         for ng_output in node_group.outputs:
-            m2p_text.write(line_prefix + "new_node_group.outputs.new(type='" + ng_output.bl_socket_idname +
+            m2p_text.write(line_prefix + "new_output = new_node_group.outputs.new(type='" + ng_output.bl_socket_idname+
                            "', name=\"" + ng_output.name + "\")\n")
+            # write the min, max, default, and 'hide value' data
+            if hasattr(ng_output, "min_value") and ng_output.min_value != -340282346638528859811704183484516925440.0:
+                m2p_text.write(line_prefix + "new_output.min_value = " + bpy_value_to_string(ng_output.min_value) + "\n")
+            if hasattr(ng_output, "max_value") and ng_output.max_value != 340282346638528859811704183484516925440.0:
+                m2p_text.write(line_prefix + "new_output.max_value = " + bpy_value_to_string(ng_output.max_value) + "\n")
+            if ng_output.default_value != 0.0 and \
+                    not bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0)) and \
+                    not ( ng_output.bl_socket_idname == 'NodeSocketColor' and \
+                          bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0, 1.0)) ):
+                m2p_text.write(line_prefix + "new_output.default_value = "+bpy_value_to_string(ng_output.default_value)+
+                               "\n")
+            if ng_output.hide_value:
+                m2p_text.write(line_prefix + "new_output.hide_value = True\n")
 
         m2p_text.write(line_prefix + "tree_nodes = new_node_group.nodes\n")
     else:
