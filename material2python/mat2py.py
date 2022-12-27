@@ -248,19 +248,27 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     is_tree_node_group = (node_group != None)
 
     m2p_text.write("# Blender Python script to re-create ")
-    if make_into_function:
-        # if using Node Group (Shader or Geometry Nodes)
-        if is_tree_node_group:
-            m2p_text.write("Node Group named \"" + mat.edit_tree.name + "\"\n\nimport bpy\n\n# add nodes and " +
-                           "links to node group \ndef add_group_nodes(node_group_name):\n")
-        # if using Compositor node tree
-        elif mat.edit_tree.bl_idname == 'CompositorNodeTree':
-            m2p_text.write("Compositor node tree\n\nimport bpy\n\n# add nodes and links to " +
-                           "compositor node tree\ndef add_material_nodes(material):\n")
-        # using Material node tree
-        else:
-            m2p_text.write("Material node tree named \"" + mat.edit_tree.name + "\"\n\nimport bpy\n\n# add nodes " +
-                           "and links to material\ndef add_material_nodes(material):\n")
+    # if using Node Group (Shader or Geometry Nodes)
+    if is_tree_node_group:
+        m2p_text.write("Node Group named " + mat.edit_tree.name + "\n\n")
+        if make_into_function:
+            m2p_text.write("import bpy\n\n" +
+                           "# add nodes and links to node group\n" +
+                           "def add_group_nodes(node_group_name):\n")
+    # if using Compositor node tree
+    elif mat.edit_tree.bl_idname == 'CompositorNodeTree':
+        m2p_text.write("Compositor node tree\n\n")
+        if make_into_function:
+            m2p_text.write("import bpy\n\n" +
+                           "# add nodes and links to compositor node tree\n" +
+                           "def add_material_nodes(material):\n")
+    # using Material node tree
+    else:
+        m2p_text.write("Material node tree named " + mat.edit_tree.name + "\n\n")
+        if make_into_function:
+            m2p_text.write("import bpy\n\n" +
+                           "# add nodes and links to material\n" +
+                           "def add_material_nodes(material):\n")
 
     if is_tree_node_group:
         m2p_text.write(line_prefix + "# initialize variables\n")
@@ -269,38 +277,67 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                        mat.edit_tree.bl_idname + "')\n")
         # write group inputs
         for ng_input in node_group.inputs:
-            m2p_text.write(line_prefix + "new_input = new_node_group.inputs.new(type='" + ng_input.bl_socket_idname +
-                           "', name=\"" + ng_input.name + "\")\n")
-            # write the min, max, default, and 'hide value' data
+            # collect lines to be written before writing, to allow for checking if input attributes need to be written
+            lines_to_write = []
+            # check/write the min, max, default, and 'hide value' data
             if hasattr(ng_input, "min_value") and ng_input.min_value != -340282346638528859811704183484516925440.0:
-                m2p_text.write(line_prefix + "new_input.min_value = " + bpy_value_to_string(ng_input.min_value) + "\n")
+                lines_to_write.append(line_prefix + "new_input.min_value = " + bpy_value_to_string(ng_input.min_value) +
+                                      "\n")
             if hasattr(ng_input, "max_value") and ng_input.max_value != 340282346638528859811704183484516925440.0:
-                m2p_text.write(line_prefix + "new_input.max_value = " + bpy_value_to_string(ng_input.max_value) + "\n")
-            if ng_input.default_value != 0.0 and \
+                lines_to_write.append(line_prefix + "new_input.max_value = " + bpy_value_to_string(ng_input.max_value) +
+                                      "\n")
+            if hasattr(ng_input, "default_value") and ng_input.default_value != 0.0 and \
                     not bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0)) and \
                     not ( ng_input.bl_socket_idname == 'NodeSocketColor' and \
                           bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0, 1.0)) ):
-                m2p_text.write(line_prefix + "new_input.default_value = "+bpy_value_to_string(ng_input.default_value)+
-                               "\n")
+                lines_to_write.append(line_prefix + "new_input.default_value = " +
+                                      bpy_value_to_string(ng_input.default_value) + "\n")
             if ng_input.hide_value:
-                m2p_text.write(line_prefix + "new_input.hide_value = True\n")
+                lines_to_write.append(line_prefix + "new_input.hide_value = True\n")
+            # create new_input variable only if necessary, i.e. if input attribute values differ from default values
+            if len(lines_to_write) > 0:
+                m2p_text.write(line_prefix + "new_input = new_node_group.inputs.new(type='" +
+                               ng_input.bl_socket_idname + "', name=\"" + ng_input.name + "\")\n")
+                for l in lines_to_write:
+                    m2p_text.write(l)
+            else:
+                m2p_text.write(line_prefix + "new_node_group.inputs.new(type='" + ng_input.bl_socket_idname +
+                               "', name=\"" + ng_input.name + "\")\n")
+
         # write group outputs
         for ng_output in node_group.outputs:
-            m2p_text.write(line_prefix + "new_output = new_node_group.outputs.new(type='" + ng_output.bl_socket_idname+
-                           "', name=\"" + ng_output.name + "\")\n")
-            # write the min, max, default, and 'hide value' data
+            # collect lines to be written before writing, to allow for checking if input attributes need to be written
+            lines_to_write = []
+            # check/write the min, max, default, and 'hide value' data
             if hasattr(ng_output, "min_value") and ng_output.min_value != -340282346638528859811704183484516925440.0:
-                m2p_text.write(line_prefix + "new_output.min_value = " + bpy_value_to_string(ng_output.min_value) + "\n")
+                lines_to_write.append(line_prefix + "new_output.min_value = " +
+                                      bpy_value_to_string(ng_output.min_value) + "\n")
             if hasattr(ng_output, "max_value") and ng_output.max_value != 340282346638528859811704183484516925440.0:
-                m2p_text.write(line_prefix + "new_output.max_value = " + bpy_value_to_string(ng_output.max_value) + "\n")
-            if ng_output.default_value != 0.0 and \
+                lines_to_write.append(line_prefix + "new_output.max_value = " +
+                                      bpy_value_to_string(ng_output.max_value) + "\n")
+            if hasattr(ng_output, "default_value") and ng_output.default_value != 0.0 and \
                     not bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0)) and \
                     not ( ng_output.bl_socket_idname == 'NodeSocketColor' and \
                           bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0, 1.0)) ):
-                m2p_text.write(line_prefix + "new_output.default_value = "+bpy_value_to_string(ng_output.default_value)+
-                               "\n")
+                lines_to_write.append(line_prefix + "new_output.default_value = " +
+                               bpy_value_to_string(ng_output.default_value) + "\n")
             if ng_output.hide_value:
-                m2p_text.write(line_prefix + "new_output.hide_value = True\n")
+                lines_to_write.append(line_prefix + "new_output.hide_value = True\n")
+            if hasattr(ng_output, "attribute_domain") and ng_output.attribute_domain != "POINT":
+                lines_to_write.append(line_prefix + "new_output.attribute_domain = '" + ng_output.attribute_domain +
+                                      "'\n")
+            if hasattr(ng_output, "default_attribute_name") and ng_output.default_attribute_name != "":
+                lines_to_write.append(line_prefix + "new_output.default_attribute_name = " +
+                                      ng_output.default_attribute_name + "\n")
+            # create new_output variable only if necessary, i.e. if output attribute values differ from default values
+            if len(lines_to_write) > 0:
+                m2p_text.write(line_prefix + "new_output = new_node_group.outputs.new(type='" +
+                               ng_output.bl_socket_idname + "', name=\"" + ng_output.name + "\")\n")
+                for l in lines_to_write:
+                    m2p_text.write(l)
+            else:
+                m2p_text.write(line_prefix + "new_node_group.outputs.new(type='" + ng_output.bl_socket_idname +
+                               "', name=\"" + ng_output.name + "\")\n")
 
         m2p_text.write(line_prefix + "tree_nodes = new_node_group.nodes\n")
     else:
@@ -442,8 +479,8 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                            "if obj != None and obj.active_material != None:\n" +
                            "    add_material_nodes(obj.active_material)\n")
     # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
-    # TODO: fix this, not working in Blender 3.1
     m2p_text.current_line_index = 0
+    m2p_text.cursor_set(0)
 
 class M2P_CreateText(bpy.types.Operator):
     """Make Python text-block from current Material/Geometry node tree"""

@@ -75,7 +75,7 @@ def register():
         "line of code output in text-block", default=4, min=0)
     bts.M2P_KeepLinks = bp.BoolProperty(name="Keep Links List", description="Add created links to a list variable",
         default=False)
-    bts.M2P_MakeFunction = bp.BoolProperty(name="Make into Function", description="Add lines of python code to " +
+    bts.M2P_MakeFunction = bp.BoolProperty(name="Make into Function", description="Add lines of Python code to " +
         "create runnable script (instead of just the bare essential code)", default=True)
     bts.M2P_DeleteExisting = bp.BoolProperty(name="Delete Existing Shader",
         description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup " +
