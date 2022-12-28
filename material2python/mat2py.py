@@ -275,6 +275,9 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         m2p_text.write(line_prefix + "new_nodes = {}\n")
         m2p_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='" +
                        mat.edit_tree.bl_idname + "')\n")
+        if delete_existing:
+            m2p_text.write(line_prefix + "new_node_group.inputs.clear()\n")
+            m2p_text.write(line_prefix + "new_node_group.outputs.clear()\n")
         # write group inputs
         for ng_input in node_group.inputs:
             # collect lines to be written before writing, to allow for checking if input attributes need to be written
@@ -286,7 +289,8 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             if hasattr(ng_input, "max_value") and ng_input.max_value != 340282346638528859811704183484516925440.0:
                 lines_to_write.append(line_prefix + "new_input.max_value = " + bpy_value_to_string(ng_input.max_value) +
                                       "\n")
-            if hasattr(ng_input, "default_value") and ng_input.default_value != 0.0 and \
+            if hasattr(ng_input, "default_value") and ng_input.default_value != None and \
+                    ng_input.default_value != 0.0 and \
                     not bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0)) and \
                     not ( ng_input.bl_socket_idname == 'NodeSocketColor' and \
                           bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0, 1.0)) ):
@@ -315,7 +319,8 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             if hasattr(ng_output, "max_value") and ng_output.max_value != 340282346638528859811704183484516925440.0:
                 lines_to_write.append(line_prefix + "new_output.max_value = " +
                                       bpy_value_to_string(ng_output.max_value) + "\n")
-            if hasattr(ng_output, "default_value") and ng_output.default_value != 0.0 and \
+            if hasattr(ng_output, "default_value")and ng_output.default_value != None and \
+                    ng_output.default_value != 0.0 and \
                     not bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0)) and \
                     not ( ng_output.bl_socket_idname == 'NodeSocketColor' and \
                           bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0, 1.0)) ):
