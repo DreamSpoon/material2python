@@ -234,7 +234,8 @@ def get_node_io_value_str(node_io_element, write_linked):
         return None
     return bpy_value_to_string(node_io_element.default_value)
 
-def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, uni_node_options):
+def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, ng_output_min_max_def,
+                     uni_node_options):
     line_prefix = ""
     if isinstance(space_pad, int):
         line_prefix = " " * space_pad
@@ -247,10 +248,13 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     node_group = bpy.data.node_groups.get(mat.edit_tree.name)
     is_tree_node_group = (node_group != None)
 
-    m2p_text.write("# Blender Python script to re-create ")
+    m2p_text.write("# Python script from Blender version " + str(bpy.app.version) + " to create ")
     # if using Node Group (Shader or Geometry Nodes)
     if is_tree_node_group:
-        m2p_text.write("Node Group named " + mat.edit_tree.name + "\n\n")
+        if mat.edit_tree.type == 'GEOMETRY':
+            m2p_text.write("Geometry Nodes node group named " + mat.edit_tree.name + "\n\n")
+        else:
+            m2p_text.write("Shader Nodes node group named " + mat.edit_tree.name + "\n\n")
         if make_into_function:
             m2p_text.write("import bpy\n\n" +
                            "# add nodes and links to node group\n" +
@@ -264,7 +268,11 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                            "def add_material_nodes(material):\n")
     # using Material node tree
     else:
-        m2p_text.write("Material node tree named " + mat.edit_tree.name + "\n\n")
+        # check if World or Object material
+        if bpy.data.worlds.get(mat.id.name):
+            m2p_text.write("World Material named " + mat.id.name + "\n\n")
+        else:
+            m2p_text.write("Object Material named " + mat.id.name + "\n\n")
         if make_into_function:
             m2p_text.write("import bpy\n\n" +
                            "# add nodes and links to material\n" +
@@ -275,9 +283,11 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         m2p_text.write(line_prefix + "new_nodes = {}\n")
         m2p_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='" +
                        mat.edit_tree.bl_idname + "')\n")
-        if delete_existing:
-            m2p_text.write(line_prefix + "new_node_group.inputs.clear()\n")
-            m2p_text.write(line_prefix + "new_node_group.outputs.clear()\n")
+        m2p_text.write("\n" + line_prefix + "# remove old group inputs and outputs\n")
+        m2p_text.write(line_prefix + "new_node_group.inputs.clear()\n")
+        m2p_text.write(line_prefix + "new_node_group.outputs.clear()\n")
+        if len(node_group.inputs) > 0 or len(node_group.outputs) > 0:
+            m2p_text.write(line_prefix + "# create new group inputs and outputs\n")
         # write group inputs
         for ng_input in node_group.inputs:
             # collect lines to be written before writing, to allow for checking if input attributes need to be written
@@ -307,34 +317,37 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             else:
                 m2p_text.write(line_prefix + "new_node_group.inputs.new(type='" + ng_input.bl_socket_idname +
                                "', name=\"" + ng_input.name + "\")\n")
-
         # write group outputs
         for ng_output in node_group.outputs:
-            # collect lines to be written before writing, to allow for checking if input attributes need to be written
+            # collect lines to be written before writing, to allow for checking if input attributes need to be
+            # written
             lines_to_write = []
-            # check/write the min, max, default, and 'hide value' data
-            if hasattr(ng_output, "min_value") and ng_output.min_value != -340282346638528859811704183484516925440.0:
-                lines_to_write.append(line_prefix + "new_output.min_value = " +
-                                      bpy_value_to_string(ng_output.min_value) + "\n")
-            if hasattr(ng_output, "max_value") and ng_output.max_value != 340282346638528859811704183484516925440.0:
-                lines_to_write.append(line_prefix + "new_output.max_value = " +
-                                      bpy_value_to_string(ng_output.max_value) + "\n")
-            if hasattr(ng_output, "default_value")and ng_output.default_value != None and \
-                    ng_output.default_value != 0.0 and \
-                    not bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0)) and \
-                    not ( ng_output.bl_socket_idname == 'NodeSocketColor' and \
-                          bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0, 1.0)) ):
-                lines_to_write.append(line_prefix + "new_output.default_value = " +
-                               bpy_value_to_string(ng_output.default_value) + "\n")
+            # write values for node group output min/max/default if needed
+            if ng_output_min_max_def:
+                # check/write the min, max, default, and 'hide value' data
+                if hasattr(ng_output, "min_value") and ng_output.min_value !=-340282346638528859811704183484516925440.0:
+                    lines_to_write.append(line_prefix + "new_output.min_value = " +
+                                          bpy_value_to_string(ng_output.min_value) + "\n")
+                if hasattr(ng_output, "max_value") and ng_output.max_value != 340282346638528859811704183484516925440.0:
+                    lines_to_write.append(line_prefix + "new_output.max_value = " +
+                                          bpy_value_to_string(ng_output.max_value) + "\n")
+                if hasattr(ng_output, "default_value")and ng_output.default_value != None and \
+                        ng_output.default_value != 0.0 and \
+                        not bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0)) and \
+                        not ( ng_output.bl_socket_idname == 'NodeSocketColor' and \
+                              bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0, 1.0)) ):
+                    lines_to_write.append(line_prefix + "new_output.default_value = " +
+                                   bpy_value_to_string(ng_output.default_value) + "\n")
             if ng_output.hide_value:
                 lines_to_write.append(line_prefix + "new_output.hide_value = True\n")
             if hasattr(ng_output, "attribute_domain") and ng_output.attribute_domain != "POINT":
-                lines_to_write.append(line_prefix + "new_output.attribute_domain = '" + ng_output.attribute_domain +
+                lines_to_write.append(line_prefix + "new_output.attribute_domain = '" + ng_output.attribute_domain+
                                       "'\n")
             if hasattr(ng_output, "default_attribute_name") and ng_output.default_attribute_name != "":
                 lines_to_write.append(line_prefix + "new_output.default_attribute_name = " +
                                       ng_output.default_attribute_name + "\n")
-            # create new_output variable only if necessary, i.e. if output attribute values differ from default values
+            # create new_output variable only if necessary, i.e. if output attribute values differ from default
+            # values
             if len(lines_to_write) > 0:
                 m2p_text.write(line_prefix + "new_output = new_node_group.outputs.new(type='" +
                                ng_output.bl_socket_idname + "', name=\"" + ng_output.name + "\")\n")
@@ -351,7 +364,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         m2p_text.write(line_prefix + "tree_nodes = material.node_tree.nodes\n")
 
     if delete_existing:
-        m2p_text.write(line_prefix + "# delete all nodes\n")
+        m2p_text.write("\n" + line_prefix + "# delete all nodes\n")
         m2p_text.write(line_prefix + "tree_nodes.clear()\n")
     m2p_text.write("\n" + line_prefix + "# create nodes\n")
 
@@ -477,7 +490,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                            "world_shader = bpy.data.worlds.new(\""+world_shader_name+"\")\n" +
                            "world_shader.use_nodes = True\n" +
                            "add_material_nodes(world_shader)\n")
-        # else using Material Shader Nodes
+        # else using Object Material Shader Nodes
         else:
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to the active material " +
                            "of the active object\nobj = bpy.context.active_object\n" +
@@ -504,13 +517,13 @@ class M2P_CreateText(bpy.types.Operator):
     def execute(self, context):
         scn = context.scene
         uni_node_options = {
-            LOC_DEC_PLACES_UNI_NODE_OPT: scn.M2P_WriteLocDecimalPlaces,
-            WRITE_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteDefaultValues,
-            WRITE_LINKED_DEFAULTS_UNI_NODE_OPT: scn.M2P_WriteLinkedDefaultValues,
-            WRITE_ATTR_NAME_UNI_NODE_OPT: scn.M2P_WriteAttribName,
-            WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: scn.M2P_WriteAttribWidthAndHeight,
-            WRITE_ATTR_SELECT_UNI_NODE_OPT: scn.M2P_WriteAttribSelect,
+            LOC_DEC_PLACES_UNI_NODE_OPT: scn.Mat2Py.write_loc_decimal_places,
+            WRITE_DEFAULTS_UNI_NODE_OPT: scn.Mat2Py.write_default_values,
+            WRITE_LINKED_DEFAULTS_UNI_NODE_OPT: scn.Mat2Py.write_linked_default_values,
+            WRITE_ATTR_NAME_UNI_NODE_OPT: scn.Mat2Py.write_attrib_name,
+            WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: scn.Mat2Py.write_attrib_width_and_height,
+            WRITE_ATTR_SELECT_UNI_NODE_OPT: scn.Mat2Py.write_attrib_select,
         }
-        create_code_text(context, scn.M2P_NumSpacePad, scn.M2P_KeepLinks, scn.M2P_MakeFunction, scn.M2P_DeleteExisting,
-                         uni_node_options)
+        create_code_text(context, scn.Mat2Py.num_space_pad, scn.Mat2Py.keep_links, scn.Mat2Py.make_function,
+                         scn.Mat2Py.delete_existing, scn.Mat2Py.ng_output_min_max_def, uni_node_options)
         return {'FINISHED'}
