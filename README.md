@@ -1,5 +1,5 @@
 # material2python addon for Blender
-Make a Python text-block from any Blender Material/Geometry node tree, from Node Editor window.
+Make a Python text-block from any Blender Material/Geometry node tree, from the Node Editor window.
 
 To use this addon:
 1) Open Node Editor window
@@ -11,9 +11,11 @@ Press 'Nodes 2 Python' button to save currently displayed nodes to Python code t
 Open text-block in Blender's built-in Text Editor, new text-block's name starts with *m2pText*
 
 The following node types can be saved to Python text-block:
-- Shader Nodes
+- Object Shader Nodes
+- World Shader Nodes
 - Compositor Nodes
 - Geometry Nodes
+- Linestyle Nodes
 
 Custom node groups for any of the above types can also be saved.
 Saving custom Node Group nodes works the same as saving any other nodes:
