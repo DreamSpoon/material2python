@@ -20,7 +20,7 @@ bl_info = {
     "name": "Material 2 Python",
     "description": "Convert material/geometry nodes to Python text-block.",
     "author": "Dave",
-    "version": (0, 4, 0),
+    "version": (0, 4, 1),
     "blender": (2, 80, 0),
     "location": "Material Shader Nodes / Geometry Shader Nodes",
     "category": "Developer",
@@ -68,7 +68,6 @@ class M2P_PT_MaterialToPython(bpy.types.Panel):
         box.prop(scn.Mat2Py, "write_default_values")
         box.prop(scn.Mat2Py, "write_linked_default_values")
 
-
 class M2P_PropGrp(PropertyGroup):
     num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
         "line of code output in text-block", default=4, min=0)
@@ -102,13 +101,12 @@ classes = [
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-
     bpy.types.Scene.Mat2Py = PointerProperty(type=M2P_PropGrp)
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
-    del bpy.types.Scene.POMster
+    del bpy.types.Scene.Mat2Py
 
 if __name__ == "__main__":
     register()

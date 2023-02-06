@@ -48,12 +48,6 @@ FILTER_OUT_ATTRIBS = ['color', 'dimensions', 'height', 'hide', 'inputs', 'intern
 
 NODES_WITH_WRITE_OUTPUTS = ['ShaderNodeValue', 'ShaderNodeRGB', 'CompositorNodeValue', 'CompositorNodeRGB']
 
-def get_world_shader_name_from_tree(node_tree):
-    for w in bpy.data.worlds:
-        if w.node_tree == node_tree:
-            return w.name
-    return None
-
 # add escape characters to backslashes and double-quote chars in given string
 def esc_char_string(in_str):
     return in_str.replace('\\', '\\\\').replace('"', '\\"')
@@ -265,18 +259,20 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         if make_into_function:
             m2p_text.write("import bpy\n\n" +
                            "# add nodes and links to compositor node tree\n" +
-                           "def add_material_nodes(material):\n")
+                           "def add_shader_nodes(material):\n")
     # using Material node tree
     else:
         # check if World or Object material
         if bpy.data.worlds.get(mat.id.name):
             m2p_text.write("World Material named " + mat.id.name + "\n\n")
+        elif bpy.data.linestyles.get(mat.id.name):
+            m2p_text.write("Linestyle Material named " + mat.id.name + "\n\n")
         else:
             m2p_text.write("Object Material named " + mat.id.name + "\n\n")
         if make_into_function:
             m2p_text.write("import bpy\n\n" +
                            "# add nodes and links to material\n" +
-                           "def add_material_nodes(material):\n")
+                           "def add_shader_nodes(material):\n")
 
     if is_tree_node_group:
         m2p_text.write(line_prefix + "# initialize variables\n")
@@ -474,28 +470,35 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     else:
         m2p_text.write("\n" + line_prefix + "return new_nodes\n")
 
+    # add function call, if needed
     if make_into_function:
-        world_shader_name = get_world_shader_name_from_tree(mat.edit_tree)
         # if using nodes in a group (Shader or Geometry Nodes)
         if is_tree_node_group:
             m2p_text.write("\n# use Python script to add nodes, and links between nodes, to new Node Group\n" +
                            "add_group_nodes('" + mat.edit_tree.name + "')\n")
+        # if using World material node tree
+        elif bpy.data.worlds.get(mat.id.name):
+            m2p_text.write("\n# use Python script to create World material, including nodes and links\n" +
+                           "world_mat = bpy.data.worlds.new(\""+mat.id.name+"\")\n" +
+                           "world_mat.use_nodes = True\n" +
+                           "add_shader_nodes(world_mat)\n")
         # if using Compositor node tree
         elif mat.edit_tree.bl_idname == 'CompositorNodeTree':
-            m2p_text.write("\n# use Python script to add nodes, and links between nodes, to compositor node tree\n" +
-                           "add_material_nodes(bpy.context.scene)\n")
-        # if using World shader node tree
-        elif world_shader_name != None:
-            m2p_text.write("\n# use Python script to add nodes, and links between nodes, to the World shader\n" +
-                           "world_shader = bpy.data.worlds.new(\""+world_shader_name+"\")\n" +
-                           "world_shader.use_nodes = True\n" +
-                           "add_material_nodes(world_shader)\n")
+            m2p_text.write("\n# use Python script to add nodes, and links between nodes, to Compositor node tree\n" +
+                           "add_shader_nodes(bpy.context.scene)\n")
+        # if using Linestyle node tree
+        elif bpy.data.linestyles.get(mat.id.name):
+            m2p_text.write("\n# use Python script to create Linestyle, including nodes and links\n" +
+                           "linestyle_mat = bpy.data.linestyles.new(\""+mat.id.name+"\")\n" +
+                           "linestyle_mat.use_nodes = True\n" +
+                           "add_shader_nodes(linestyle_mat)\n")
         # else using Object Material Shader Nodes
         else:
-            m2p_text.write("\n# use Python script to add nodes, and links between nodes, to the active material " +
-                           "of the active object\nobj = bpy.context.active_object\n" +
-                           "if obj != None and obj.active_material != None:\n" +
-                           "    add_material_nodes(obj.active_material)\n")
+            m2p_text.write("\n# use Python script to create Material, including nodes and links\n" +
+                           "mat = bpy.data.materials.new(\""+mat.id.name+"\")\n" +
+                           "mat.use_nodes = True\n" +
+                           "add_shader_nodes(mat)\n")
+
     # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
     m2p_text.current_line_index = 0
     m2p_text.cursor_set(0)
