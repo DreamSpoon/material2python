@@ -1,7 +1,11 @@
 # material2python addon for Blender
 Make a Python text-block from any Blender Material/Geometry node tree, from the Node Editor window.
 
-To use this addon:
+This addon has been deprecated, and its code merged into Py Recorder addon for Blender.
+
+https://github.com/DreamSpoon/py_recorder
+
+# To use this addon:
 1) Open Node Editor window
 2) Look in Tool menu -> Mat2Python panel
   - Tool menu is to the right side of Node Editor window
